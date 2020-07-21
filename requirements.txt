@@ -1,0 +1,8 @@
+pycocotools==2.0.1
+opencv_python==4.3.0.36
+matplotlib==3.1.2
+numpy==1.17.3
+absl_py==0.8.1
+h5py==2.10.0
+contextlib2==0.6.0.post1
+Pillow==7.2.0
