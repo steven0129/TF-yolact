@@ -37,8 +37,8 @@ flags.DEFINE_float('lr', 1e-3,
                    'learning rate')
 flags.DEFINE_float('momentum', 0.9,
                    'momentum')
-flags.DEFINE_float('weight_decay', 5 * 1e-4,
-                   'weight_decay')
+# flags.DEFINE_float('weight_decay', 5 * 1e-4,
+#                    'weight_decay')
 flags.DEFINE_float('print_interval', 10,
                    'number of iteration between printing loss')
 flags.DEFINE_float('save_interval', 10000,
@@ -129,13 +129,12 @@ def main(argv):
                           scales=[24, 48, 96, 192, 384])
 
     model = YOLACT.gen()
-
     # add weight decay
-    for layer in model.layers:
-        if isinstance(layer, tf.keras.layers.Conv2D) or isinstance(layer, tf.keras.layers.Dense):
-            layer.add_loss(lambda: tf.keras.regularizers.l2(FLAGS.weight_decay)(layer.kernel))
-        if hasattr(layer, 'bias_regularizer') and layer.use_bias:
-            layer.add_loss(lambda: tf.keras.regularizers.l2(FLAGS.weight_decay)(layer.bias))
+    # for layer in model.layers:
+    #     if isinstance(layer, tf.keras.layers.Conv2D) or isinstance(layer, tf.keras.layers.Dense):
+    #         layer.add_loss(lambda: tf.keras.regularizers.l2(FLAGS.weight_decay)(layer.kernel))
+    #     if hasattr(layer, 'bias_regularizer') and layer.use_bias:
+    #         layer.add_loss(lambda: tf.keras.regularizers.l2(FLAGS.weight_decay)(layer.bias))
 
     # -----------------------------------------------------------------
     # Choose the Optimizor, Loss Function, and Metrics, learning rate schedule
