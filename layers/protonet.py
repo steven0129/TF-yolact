@@ -120,6 +120,13 @@ class ProtoNet(tf.keras.layers.Layer):
         self.final_conv_bn_pw = tf.keras.layers.BatchNormalization(axis=-1)
         self.final_conv_relu_pw = tf.keras.layers.ReLU()
 
+        # Dropout
+        self.dropout1 = tf.keras.layers.Dropout(0.1)
+        self.dropout2 = tf.keras.layers.Dropout(0.1)
+        self.dropout3 = tf.keras.layers.Dropout(0.1)
+        self.dropout4 = tf.keras.layers.Dropout(0.1)
+        self.dropout_final = tf.keras.layers.Dropout(0.1)
+
     def call(self, x):
         x = self.conv1_dw(x)
         x = self.conv1_bn_dw(x)
@@ -127,6 +134,7 @@ class ProtoNet(tf.keras.layers.Layer):
         x = self.conv1_pw(x)
         x = self.conv1_bn_pw(x)
         x = self.conv1_relu_pw(x)
+        x = self.dropout1(x)
 
         x = self.conv2_dw(x)
         x = self.conv2_bn_dw(x)
@@ -134,6 +142,7 @@ class ProtoNet(tf.keras.layers.Layer):
         x = self.conv2_pw(x)
         x = self.conv2_bn_pw(x)
         x = self.conv2_relu_pw(x)
+        x = self.dropout2(x)
 
         x = self.conv3_dw(x)
         x = self.conv3_bn_dw(x)
@@ -141,6 +150,7 @@ class ProtoNet(tf.keras.layers.Layer):
         x = self.conv3_pw(x)
         x = self.conv3_bn_pw(x)
         x = self.conv3_relu_pw(x)
+        x = self.dropout3(x)
 
         # upsampling + convolution
         x = self.upSampling(x)
@@ -151,6 +161,7 @@ class ProtoNet(tf.keras.layers.Layer):
         x = self.conv4_pw(x)
         x = self.conv4_bn_pw(x)
         x = self.conv4_relu_pw(x)
+        x = self.dropout4(x)
 
         # final convolution
         x = self.final_conv_dw(x)
@@ -159,5 +170,6 @@ class ProtoNet(tf.keras.layers.Layer):
         x = self.final_conv_pw(x)
         x = self.final_conv_bn_pw(x)
         x = self.final_conv_relu_pw(x)
+        x = self.dropout_final(x)
         
         return x

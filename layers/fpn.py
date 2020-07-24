@@ -93,10 +93,18 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         self.predictP3_bn_pw = tf.keras.layers.BatchNormalization(axis=-1)
         self.predictP3_relu_pw = tf.keras.layers.ReLU()
 
+        # Dropout
+        self.dropout3 = tf.keras.layers.Dropout(0.1)
+        self.dropout4 = tf.keras.layers.Dropout(0.1)
+        self.dropout5 = tf.keras.layers.Dropout(0.1)
+        self.dropout6 = tf.keras.layers.Dropout(0.1)
+        self.dropout7 = tf.keras.layers.Dropout(0.1)
+
 
     def call(self, c3, c4, c5):
         # lateral conv for c3 c4 c5
         p5 = self.lateralCov1(c5)
+        p5 = self.dropout5(p5)
         p4 = self._crop_and_add(self.upSample(p5), self.lateralCov2(c4))
         p3 = self._crop_and_add(self.upSample(p4), self.lateralCov3(c3))
         # print("p3: ", p3.shape)
@@ -108,6 +116,7 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         p3 = self.predictP3_conv_pw(p3)
         p3 = self.predictP3_bn_pw(p3)
         p3 = self.predictP3_relu_pw(p3)
+        p3 = self.dropout3(p3)
         
         p4 = self.predictP4_conv_dw(p4)
         p4 = self.predictP4_bn_dw(p4)
@@ -115,6 +124,7 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         p4 = self.predictP4_conv_pw(p4)
         p4 = self.predictP4_bn_pw(p4)
         p4 = self.predictP4_relu_pw(p4)
+        p4 = self.dropout4(p4)
         
         p5 = self.predictP5_conv_dw(p5)
         p5 = self.predictP5_bn_dw(p5)
@@ -122,10 +132,13 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         p5 = self.predictP5_conv_pw(p5)
         p5 = self.predictP5_bn_pw(p5)
         p5 = self.predictP5_relu_pw(p5)
+        p5 = self.dropout5(p5)
 
         # downsample conv to get p6, p7
         p6 = self.downSample1(p5)
+        p6 = self.dropout6(p6)
         p7 = self.downSample2(p6)
+        p7 = self.dropout7(p7)
 
         return [p3, p4, p5, p6, p7]
 

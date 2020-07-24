@@ -104,6 +104,12 @@ class PredictionModule(tf.keras.layers.Layer):
         self.boxReshape = tf.keras.layers.Reshape((-1, 4))
         self.maskReshape = tf.keras.layers.Reshape((-1, num_mask))
 
+        # Dropout
+        self.dropout_input = tf.keras.layers.Dropout(0.1)
+        self.dropout_class = tf.keras.layers.Dropout(0.1)
+        self.dropout_box = tf.keras.layers.Dropout(0.1)
+        self.dropout_mask = tf.keras.layers.Dropout(0.1)
+
     def call(self, p):
         p = self.input_conv_dw(p)
         p = self.input_bn_dw(p)
@@ -111,6 +117,7 @@ class PredictionModule(tf.keras.layers.Layer):
         p = self.input_conv_pw(p)
         p = self.input_bn_pw(p)
         p = self.input_relu_pw(p)
+        p = self.dropout_input(p)
         
         # Class Head
         x = self.class_conv_dw(p)
@@ -119,6 +126,7 @@ class PredictionModule(tf.keras.layers.Layer):
         x = self.class_conv_pw(x)
         x = self.class_bn_pw(x)
         pred_class = self.class_relu_pw(x)
+        pred_class = self.dropout_class(pred_class)
 
         # Box Head
         x = self.box_conv_dw(p)
@@ -127,6 +135,7 @@ class PredictionModule(tf.keras.layers.Layer):
         x = self.box_conv_pw(x)
         x = self.box_bn_pw(x)
         pred_box = self.box_relu_pw(x)
+        pred_box = self.dropout_box(pred_box)
 
         # Mask Head
         x = self.mask_conv_dw(p)
@@ -135,6 +144,7 @@ class PredictionModule(tf.keras.layers.Layer):
         x = self.mask_conv_pw(x)
         x = self.mask_bn_pw(x)
         pred_mask = self.mask_relu_pw(x)
+        pred_mask = self.dropout_mask(pred_mask)
 
         # reshape the prediction head result for following loss calculation
         pred_class = self.classReshape(pred_class)
