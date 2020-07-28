@@ -117,6 +117,7 @@ class Parser(object):
             self._match_threshold, self._unmatched_threshold, boxes, classes)
 
         # Padding classes and mask to fix length [None, num_max_fix_padding, ...]
+        # Background --> 0
         num_padding = self._num_max_fix_padding - tf.shape(classes)[0]
         pad_classes = tf.zeros([num_padding], dtype=tf.int64)
         pad_boxes = tf.zeros([num_padding, 4])
