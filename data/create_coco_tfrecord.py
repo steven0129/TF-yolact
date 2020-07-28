@@ -155,19 +155,20 @@ def create_tf_example(image,
         encoded_mask_png.append(output_io.getvalue())
 
     # Label Remapping
+    # Background --> 0
     remapping = {
-        1: 0, # Person
-        2: 1, # Bicycle
-        3: 2, # Car -> Car
-        6: 2, # Bus -> Car
-        4: 3, # Motorbike
-        5: 4, # Airplane
-        9: 5, # Ship (Boat)
-        16: 6, # Bird
-        17: 7, # Cat
-        18: 8, # Dog
-        19: 9, # Horse
-        21: 10  # Cow
+        1: 1, # Person
+        2: 2, # Bicycle
+        3: 3, # Car -> Car
+        6: 3, # Bus -> Car
+        4: 4, # Motorbike
+        5: 5, # Airplane
+        9: 6, # Ship (Boat)
+        16: 7, # Bird
+        17: 8, # Cat
+        18: 9, # Dog
+        19: 10, # Horse
+        21: 11  # Cow
     }
     
     category_ids = list(map(lambda x: remapping[x], category_ids))
