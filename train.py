@@ -56,7 +56,7 @@ def train_step(model,
                labels):
     # training using tensorflow gradient tape
     with tf.GradientTape() as tape:
-        pred = model(image)
+        pred = model(image, training=True)
         output = {
             'seg': pred[0],
             'proto_out': pred[1],
@@ -121,9 +121,9 @@ def main(argv):
     # Creating the instance of the model specified.
     logging.info("Creating the model instance of YOLACT")
     YOLACT = lite.MyYolact(input_size=256,
-                          fpn_channels=256,
+                          fpn_channels=160,
                           feature_map_size=[69, 35, 18, 9, 5],
-                          num_class=11,
+                          num_class=12, # 11 classes + 1 background
                           num_mask=32,
                           aspect_ratio=[1, 0.5, 2],
                           scales=[24, 48, 96, 192, 384])
@@ -191,12 +191,7 @@ def main(argv):
 
         checkpoint.step.assign_add(1)
         iterations += 1
-        with options({'constant_folding': True,
-                      'layout_optimize': True,
-                      'loop_optimization': True,
-                      'arithmetic_optimization': True,
-                      'remapping': True}):
-            loc_loss, conf_loss, mask_loss, seg_loss = train_step(model, criterion, train_loss, optimizer, image, labels)
+        loc_loss, conf_loss, mask_loss, seg_loss = train_step(model, criterion, train_loss, optimizer, image, labels)
         loc.update_state(loc_loss)
         conf.update_state(conf_loss)
         mask.update_state(mask_loss)
@@ -229,12 +224,7 @@ def main(argv):
                 if valid_iter > FLAGS.valid_iter:
                     break
                 # calculate validation loss
-                with options({'constant_folding': True,
-                              'layout_optimize': True,
-                              'loop_optimization': True,
-                              'arithmetic_optimization': True,
-                              'remapping': True}):
-                    valid_loc_loss, valid_conf_loss, valid_mask_loss, valid_seg_loss = valid_step(model,
+                valid_loc_loss, valid_conf_loss, valid_mask_loss, valid_seg_loss = valid_step(model,
                                                                                                   criterion,
                                                                                                   valid_loss,
                                                                                                   valid_image,
@@ -270,20 +260,6 @@ def main(argv):
                 # Saving the weights:
                 best_val = valid_loss.result()
                 model.save_weights('./weights/weights_' + str(valid_loss.result().numpy()) + '.h5')
-
-            # reset the metrics
-            train_loss.reset_states()
-            loc.reset_states()
-            conf.reset_states()
-            mask.reset_states()
-            seg.reset_states()
-
-            valid_loss.reset_states()
-            v_loc.reset_states()
-            v_conf.reset_states()
-            v_mask.reset_states()
-            v_seg.reset_states()
-
 
 if __name__ == '__main__':
     app.run(main)
