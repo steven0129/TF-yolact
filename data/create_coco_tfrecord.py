@@ -31,16 +31,22 @@ import hashlib
 import io
 import json
 import os
+import cv2
 
 import PIL.Image
 import contextlib2
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
+
 # use absl for tf 2.0
 from absl import app
 from absl import flags
 from absl import logging
 from pycocotools import mask
+from pycocotools.coco import COCO
+import pycocotools.mask as mask_util
+from skimage.measure import regionprops
 
 from data import dataset_util
 
@@ -63,7 +69,21 @@ flags.DEFINE_string('testdev_annotations_file', '',
 flags.DEFINE_string('output_dir', './coco', 'Output data directory.')
 
 logging.set_verbosity(logging.INFO)
+dp_coco = COCO( f'data/DensePose/all.json' )
 
+def GenDPMask(ann):
+    mask_body = np.zeros([256, 256])
+    mask_face = np.zeros([256, 256])
+    for i in range(0, 13):
+        if len(ann['dp_masks'][i]) != 0:
+            curr_mask = mask_util.decode(ann['dp_masks'][i])
+            mask_body[curr_mask > 0] = 1
+    
+    if len(ann['dp_masks'][13]) != 0:
+        curr_mask = mask_util.decode(ann['dp_masks'][13])
+        mask_face[curr_mask > 0] = 1
+
+    return mask_face, mask_body
 
 def create_tf_example(image,
                       annotations_list,
@@ -125,6 +145,8 @@ def create_tf_example(image,
     num_annotations_skipped = 0
 
     for object_annotations in annotations_list:
+        category_id = int(object_annotations['category_id'])
+
         (x, y, width, height) = tuple(object_annotations['bbox'])
         if width <= 0 or height <= 0:
             num_annotations_skipped += 1
@@ -132,43 +154,123 @@ def create_tf_example(image,
         if x + width > image_width or y + height > image_height:
             num_annotations_skipped += 1
             continue
-        xmin.append(float(x) / image_width)
-        xmax.append(float(x + width) / image_width)
-        ymin.append(float(y) / image_height)
-        ymax.append(float(y + height) / image_height)
-        is_crowd.append(object_annotations['iscrowd'])
-        category_id = int(object_annotations['category_id'])
-        category_ids.append(category_id)
-        category_names.append(category_index[category_id]['name'].encode('utf8'))
-        area.append(object_annotations['area'])
 
-        run_len_encoding = mask.frPyObjects(object_annotations['segmentation'],
-                                            image_height, image_width)
-        binary_mask = mask.decode(run_len_encoding)
+        if category_id == 1: # Person --> Person Face & Person Body
+            try:
+                img = dp_coco.loadImgs(image_id)[0]
+                ann_ids = dp_coco.getAnnIds(imgIds=img['id'])
+                anns = dp_coco.loadAnns(ann_ids)
 
-        if not object_annotations['iscrowd']:
-            binary_mask = np.amax(binary_mask, axis=2)
+                for ann in anns:
+                    if 'dp_masks' in ann.keys():
+                        mask_face, mask_body = GenDPMask(ann)
+                        img_face = cv2.imread(f'{image_dir}/{filename}')
+                        img_face = cv2.cvtColor(img_face, cv2.COLOR_BGR2RGB)
+                        img_body = img_face.copy()
 
-        pil_image = PIL.Image.fromarray(binary_mask)
-        output_io = io.BytesIO()
-        pil_image.save(output_io, format='PNG')
-        encoded_mask_png.append(output_io.getvalue())
+                        bbr = np.array(ann['bbox']).astype(int)
+                        x1, y1, x2, y2 = bbr[0], bbr[1], bbr[0]+bbr[2], bbr[1]+bbr[3]
+                        x2 = min( [x2, img_face.shape[1]] )
+                        y2 = min( [y2, img_face.shape[0]] )
+
+                        # Person Face
+                        if np.count_nonzero(mask_face) != 0:
+                            category_id = 1 
+                            category_ids.append(category_id)
+                            category_names.append('Person Face'.encode('utf8'))
+
+                            mask_face = cv2.resize(mask_face, (int(x2 - x1), int(y2 - y1)), interpolation=cv2.INTER_NEAREST)
+                            mask_face = (mask_face == 1)
+                            binary_mask = np.zeros((img_face.shape[0], img_face.shape[1]))
+                            binary_mask[y1:y2, x1:x2][mask_face] = 1
+                            binary_mask = np.uint8(binary_mask)
+                            
+                            props = regionprops(binary_mask)
+                            prop = props[0]
+
+                            xmin.append(float(prop.bbox[1]) / image_width)
+                            xmax.append(float(prop.bbox[3]) / image_width)
+                            ymin.append(float(prop.bbox[0]) / image_height)
+                            ymax.append(float(prop.bbox[2]) / image_height)
+                            is_crowd.append(ann['iscrowd'])
+                            area.append(prop.area)
+
+                            pil_image = PIL.Image.fromarray(binary_mask)
+                            output_io = io.BytesIO()
+                            pil_image.save(output_io, format='PNG')
+                            encoded_mask_png.append(output_io.getvalue())
+
+                        # Person Body
+                        if np.count_nonzero(mask_body) != 0:
+                            category_id = 2 
+                            category_ids.append(category_id)
+                            category_names.append('Person Body'.encode('utf8'))
+                            
+                            mask_body = cv2.resize(mask_body, (int(x2 - x1), int(y2 - y1)), interpolation=cv2.INTER_NEAREST)
+                            mask_body = (mask_body == 1)
+                            binary_mask = np.zeros((img_face.shape[0], img_face.shape[1]))
+                            binary_mask[y1:y2, x1:x2][mask_body] = 1
+                            binary_mask = np.uint8(binary_mask)
+
+                            props = regionprops(binary_mask)
+                            prop = props[0]
+
+                            xmin.append(float(prop.bbox[1]) / image_width)
+                            xmax.append(float(prop.bbox[3]) / image_width)
+                            ymin.append(float(prop.bbox[0]) / image_height)
+                            ymax.append(float(prop.bbox[2]) / image_height)
+                            is_crowd.append(ann['iscrowd'])
+                            area.append(prop.area)
+
+                            pil_image = PIL.Image.fromarray(binary_mask)
+                            output_io = io.BytesIO()
+                            pil_image.save(output_io, format='PNG')
+                            encoded_mask_png.append(output_io.getvalue())
+
+            except KeyError:
+                pass
+        
+        else:
+            xmin.append(float(x) / image_width)
+            xmax.append(float(x + width) / image_width)
+            ymin.append(float(y) / image_height)
+            ymax.append(float(y + height) / image_height)
+            is_crowd.append(object_annotations['iscrowd'])
+
+            category_ids.append(category_id)
+            category_names.append(category_index[category_id]['name'].encode('utf8'))
+            area.append(object_annotations['area'])
+
+            run_len_encoding = mask.frPyObjects(object_annotations['segmentation'],
+                                                image_height, image_width)
+            binary_mask = mask.decode(run_len_encoding)
+
+            if not object_annotations['iscrowd']:
+                binary_mask = np.amax(binary_mask, axis=2)  # (H, W, 1) --> (H, W)
+
+            
+            pil_image = PIL.Image.fromarray(binary_mask)
+            output_io = io.BytesIO()
+            pil_image.save(output_io, format='PNG')
+            encoded_mask_png.append(output_io.getvalue())
 
     # Label Remapping
     # Background --> 0
     remapping = {
-        1: 1, # Person
-        2: 2, # Bicycle
-        3: 3, # Car -> Car
-        6: 3, # Bus -> Car
-        4: 4, # Motorbike
-        5: 5, # Airplane
-        9: 6, # Ship (Boat)
-        16: 7, # Bird
-        17: 8, # Cat
-        18: 9, # Dog
-        19: 10, # Horse
-        21: 11  # Cow
+        # Person --> Person Face & Person Body
+        1: 1,  # Person Face
+        2: 2,  # Person Body
+        2: 3, # Bicycle
+        3: 4, # Car -> Car
+        6: 4, # Bus -> Car
+        4: 5, # Motorbike
+        5: 6, # Airplane
+        9: 7, # Ship (Boat)
+        16: 8, # Bird
+        17: 9, # Cat
+        18: 10, # Dog
+        19: 11, # Horse
+        21: 12  # Cow
     }
     
     category_ids = list(map(lambda x: remapping[x], category_ids))
@@ -208,7 +310,7 @@ def create_tf_example(image,
     }
     
     example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
-    return key, example, num_annotations_skipped
+    return key, example, num_annotations_skipped, len(category_ids)
 
 
 def _create_tf_record_from_coco_annotations(
@@ -252,10 +354,11 @@ def _create_tf_record_from_coco_annotations(
                      missing_annotation_count)
 
         total_num_annotations_skipped = 0
+        total_num_instances = 0
 
         for idx, image in enumerate(images):
             if idx % 100 == 0:
-                logging.info('On image %d of %d', idx, len(images))
+                logging.info(f'On image {idx} of {len(images)}. Process {total_num_instances} instances.')
             annotations_list = annotations_index[image['id']]
             annotations_list = list(filter(dataset_util.lg_filter, annotations_list))
 
@@ -266,8 +369,9 @@ def _create_tf_record_from_coco_annotations(
                     num_crowd += 1
             
             if num_crowd != len(annotations_list):
-                _, tf_example, num_annotations_skipped = create_tf_example(image, annotations_list, image_dir, category_index)
+                _, tf_example, num_annotations_skipped, num_instances = create_tf_example(image, annotations_list, image_dir, category_index)
                 total_num_annotations_skipped += num_annotations_skipped
+                total_num_instances += num_instances
                 shard_idx = idx % num_shards
                 output_tfrecords[shard_idx].write(tf_example.SerializeToString())
             else:
