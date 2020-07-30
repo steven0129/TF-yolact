@@ -175,7 +175,7 @@ def create_tf_example(image,
 
                         # Person Face
                         if np.count_nonzero(mask_face) != 0:
-                            category_id = 1 
+                            category_id = -1 
                             category_ids.append(category_id)
                             category_names.append('Person Face'.encode('utf8'))
 
@@ -202,7 +202,7 @@ def create_tf_example(image,
 
                         # Person Body
                         if np.count_nonzero(mask_body) != 0:
-                            category_id = 2 
+                            category_id = -2 
                             category_ids.append(category_id)
                             category_names.append('Person Body'.encode('utf8'))
                             
@@ -258,8 +258,8 @@ def create_tf_example(image,
     # Background --> 0
     remapping = {
         # Person --> Person Face & Person Body
-        1: 1,  # Person Face
-        2: 2,  # Person Body
+        -1: 1,  # Person Face
+        -2: 2,  # Person Body
         2: 3, # Bicycle
         3: 4, # Car -> Car
         6: 4, # Bus -> Car
