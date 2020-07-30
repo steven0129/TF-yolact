@@ -1,5 +1,46 @@
 import tensorflow as tf
 
+class DwConv(tf.keras.layers.Layer):
+    def __init__(self, num_filters, dropout=None):
+        super(DwConv, self).__init__()
+        self.conv_dw = tf.keras.layers.DepthwiseConv2D(
+            (3, 3), 
+            padding='same', 
+            depth_multiplier=1, 
+            strides=1, 
+            use_bias=False
+        )
+
+        self.conv_bn_dw = tf.keras.layers.BatchNormalization(axis=-1)
+        self.conv_relu_dw = tf.keras.layers.ReLU()
+        self.conv_pw = tf.keras.layers.Conv2D(
+            num_filters, 
+            (1, 1),
+            padding='same',
+            use_bias=False,
+            strides=1,
+        )
+
+        self.conv_bn_pw = tf.keras.layers.BatchNormalization(axis=-1)
+        self.conv_relu_pw = tf.keras.layers.ReLU()
+
+        if dropout != None:
+            self.dropout = tf.keras.layers.Dropout(dropout)
+        else:
+            self.dropout = None
+
+    def call(self, x):
+        x = self.conv_dw(x)
+        x = self.conv_bn_dw(x)
+        x = self.conv_relu_dw(x)
+        x = self.conv_pw(x)
+        x = self.conv_bn_pw(x)
+        x = self.conv_relu_pw(x)
+
+        if self.dropout != None:
+            x = self.dropout(x)
+
+        return x
 
 class FeaturePyramidNeck(tf.keras.layers.Layer):
     """
@@ -26,77 +67,10 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         self.lateralCov3 = tf.keras.layers.Conv2D(num_fpn_filters, (1, 1), 1, padding="same",
                                                   kernel_initializer=tf.keras.initializers.glorot_uniform())
 
-        # Predict Layer P5
-        self.predictP5_conv_dw = tf.keras.layers.DepthwiseConv2D(
-            (3, 3), 
-            padding='same', 
-            depth_multiplier=1, 
-            strides=1, 
-            use_bias=False
-        )
+        self.predictP5 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
+        self.predictP4 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
+        self.predictP3 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
 
-        self.predictP5_bn_dw = tf.keras.layers.BatchNormalization(axis=-1)
-        self.predictP5_relu_dw = tf.keras.layers.ReLU()
-        self.predictP5_conv_pw = tf.keras.layers.Conv2D(
-            num_fpn_filters, 
-            (1, 1),
-            padding='same',
-            use_bias=False,
-            strides=1,
-        )
-
-        self.predictP5_bn_pw = tf.keras.layers.BatchNormalization(axis=-1)
-        self.predictP5_relu_pw = tf.keras.layers.ReLU()
-
-        # Predict Layer P4
-        self.predictP4_conv_dw = tf.keras.layers.DepthwiseConv2D(
-            (3, 3), 
-            padding='same', 
-            depth_multiplier=1, 
-            strides=1, 
-            use_bias=False
-        )
-
-        self.predictP4_bn_dw = tf.keras.layers.BatchNormalization(axis=-1)
-        self.predictP4_relu_dw = tf.keras.layers.ReLU()
-        self.predictP4_conv_pw = tf.keras.layers.Conv2D(
-            num_fpn_filters, 
-            (1, 1),
-            padding='same',
-            use_bias=False,
-            strides=1,
-        )
-
-        self.predictP4_bn_pw = tf.keras.layers.BatchNormalization(axis=-1)
-        self.predictP4_relu_pw = tf.keras.layers.ReLU()
-
-
-        # Predict Layer P3
-        self.predictP3_conv_dw = tf.keras.layers.DepthwiseConv2D(
-            (3, 3), 
-            padding='same', 
-            depth_multiplier=1, 
-            strides=1, 
-            use_bias=False
-        )
-
-        self.predictP3_bn_dw = tf.keras.layers.BatchNormalization(axis=-1)
-        self.predictP3_relu_dw = tf.keras.layers.ReLU()
-        self.predictP3_conv_pw = tf.keras.layers.Conv2D(
-            num_fpn_filters, 
-            (1, 1),
-            padding='same',
-            use_bias=False,
-            strides=1,
-        )
-
-        self.predictP3_bn_pw = tf.keras.layers.BatchNormalization(axis=-1)
-        self.predictP3_relu_pw = tf.keras.layers.ReLU()
-
-        # Dropout
-        self.dropout3 = tf.keras.layers.Dropout(0.1)
-        self.dropout4 = tf.keras.layers.Dropout(0.1)
-        self.dropout5 = tf.keras.layers.Dropout(0.1)
         self.dropout6 = tf.keras.layers.Dropout(0.1)
         self.dropout7 = tf.keras.layers.Dropout(0.1)
 
@@ -107,32 +81,11 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         p5 = self.dropout5(p5)
         p4 = self._crop_and_add(self.upSample(p5), self.lateralCov2(c4))
         p3 = self._crop_and_add(self.upSample(p4), self.lateralCov3(c3))
-        # print("p3: ", p3.shape)
 
         # smooth pred layer for p3, p4, p5
-        p3 = self.predictP3_conv_dw(p3)
-        p3 = self.predictP3_bn_dw(p3)
-        p3 = self.predictP3_relu_dw(p3)
-        p3 = self.predictP3_conv_pw(p3)
-        p3 = self.predictP3_bn_pw(p3)
-        p3 = self.predictP3_relu_pw(p3)
-        p3 = self.dropout3(p3)
-        
-        p4 = self.predictP4_conv_dw(p4)
-        p4 = self.predictP4_bn_dw(p4)
-        p4 = self.predictP4_relu_dw(p4)
-        p4 = self.predictP4_conv_pw(p4)
-        p4 = self.predictP4_bn_pw(p4)
-        p4 = self.predictP4_relu_pw(p4)
-        p4 = self.dropout4(p4)
-        
-        p5 = self.predictP5_conv_dw(p5)
-        p5 = self.predictP5_bn_dw(p5)
-        p5 = self.predictP5_relu_dw(p5)
-        p5 = self.predictP5_conv_pw(p5)
-        p5 = self.predictP5_bn_pw(p5)
-        p5 = self.predictP5_relu_pw(p5)
-        p5 = self.dropout5(p5)
+        p3 = self.predictP3(p3)
+        p4 = self.predictP4(p4)
+        p5 = self.predictP5(p5)
 
         # downsample conv to get p6, p7
         p6 = self.downSample1(p5)
