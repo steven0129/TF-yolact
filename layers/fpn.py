@@ -78,7 +78,6 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
     def call(self, c3, c4, c5):
         # lateral conv for c3 c4 c5
         p5 = self.lateralCov1(c5)
-        p5 = self.dropout5(p5)
         p4 = self._crop_and_add(self.upSample(p5), self.lateralCov2(c4))
         p3 = self._crop_and_add(self.upSample(p4), self.lateralCov3(c3))
 
