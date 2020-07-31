@@ -66,7 +66,7 @@ class Trainer():
                 'pred_mask_coef': pred[4]
             }
 
-            loc_loss, conf_loss, mask_loss, seg_loss, total_loss = self.loss_fn(output, labels, 11)
+            loc_loss, conf_loss, mask_loss, seg_loss, total_loss = self.loss_fn(output, labels, 13)
         
             grads = tape.gradient(total_loss, self.model.trainable_variables)
             self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
@@ -85,7 +85,7 @@ class Trainer():
             'pred_mask_coef': pred[4]
         }
 
-        loc_loss, conf_loss, mask_loss, seg_loss, total_loss = self.loss_fn(output, labels, 11)
+        loc_loss, conf_loss, mask_loss, seg_loss, total_loss = self.loss_fn(output, labels, 13)
         self.val_metric.update_state(total_loss)
         return loc_loss, conf_loss, mask_loss, seg_loss
 
