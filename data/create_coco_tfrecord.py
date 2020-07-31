@@ -370,12 +370,15 @@ def _create_tf_record_from_coco_annotations(
             
             if num_crowd != len(annotations_list):
                 _, tf_example, num_annotations_skipped, num_instances = create_tf_example(image, annotations_list, image_dir, category_index)
-                total_num_annotations_skipped += num_annotations_skipped
-                total_num_instances += num_instances
-                shard_idx = idx % num_shards
-                output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+                if num_instances != 0:
+                    total_num_annotations_skipped += num_annotations_skipped
+                    total_num_instances += num_instances
+                    shard_idx = idx % num_shards
+                    output_tfrecords[shard_idx].write(tf_example.SerializeToString())
             else:
                 total_num_annotations_skipped += len(annotations_list)
+
+            if idx == 1000: break
 
         logging.info('Finished writing, skipped %d annotations.',
                      total_num_annotations_skipped)
