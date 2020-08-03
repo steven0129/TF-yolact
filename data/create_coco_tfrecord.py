@@ -143,6 +143,7 @@ def create_tf_example(image,
     area = []
     encoded_mask_png = []
     num_annotations_skipped = 0
+    dp_triggered = True  # DensePose preprocessing just one time
 
     for object_annotations in annotations_list:
         category_id = int(object_annotations['category_id'])
@@ -155,7 +156,7 @@ def create_tf_example(image,
             num_annotations_skipped += 1
             continue
 
-        if category_id == 1: # Person --> Person Face & Person Body
+        if category_id == 1 and dp_triggered: # Person --> Person Face & Person Body
             try:
                 img = dp_coco.loadImgs(image_id)[0]
                 ann_ids = dp_coco.getAnnIds(imgIds=img['id'])
@@ -227,9 +228,12 @@ def create_tf_example(image,
                             pil_image.save(output_io, format='PNG')
                             encoded_mask_png.append(output_io.getvalue())
 
+                dp_triggered = False
+
             except KeyError:
                 pass
-        
+        elif category_id == 1 and not dp_triggered:
+            continue
         else:
             xmin.append(float(x) / image_width)
             xmax.append(float(x + width) / image_width)
@@ -272,8 +276,9 @@ def create_tf_example(image,
         19: 11, # Horse
         21: 12  # Cow
     }
-    
+
     category_ids = list(map(lambda x: remapping[x], category_ids))
+
     feature_dict = {
         'image/height':
             dataset_util.int64_feature(r),
@@ -377,8 +382,6 @@ def _create_tf_record_from_coco_annotations(
                     output_tfrecords[shard_idx].write(tf_example.SerializeToString())
             else:
                 total_num_annotations_skipped += len(annotations_list)
-
-            if idx == 1000: break
 
         logging.info('Finished writing, skipped %d annotations.',
                      total_num_annotations_skipped)

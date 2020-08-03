@@ -7,6 +7,7 @@ import tensorflow as tf
 class TfExampleDecoder(object):
     def __init__(self):
         self._keys_to_features = {
+            'image/source_id': tf.io.FixedLenFeature([], dtype=tf.string),
             'image/height': tf.io.FixedLenFeature([], dtype=tf.int64),
             'image/width': tf.io.FixedLenFeature([], dtype=tf.int64),
             'image/encoded': tf.io.FixedLenFeature([], dtype=tf.string),
