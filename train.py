@@ -122,12 +122,12 @@ def main(argv):
     # Creating the instance of the model specified.
     logging.info("Creating the model instance of YOLACT")
     YOLACT = lite.MyYolact(input_size=256,
-                          fpn_channels=160,
+                          fpn_channels=256,
                           feature_map_size=[32, 16, 8, 4, 2],
                           num_class=13, # 12 classes + 1 background
                           num_mask=32,
                           aspect_ratio=[1, 0.5, 2],
-                          scales=[24, 48, 96, 192, 384])
+                          scales=[24 * 2, 48 * 2, 96 * 2, 192 * 2, 384 * 2])
 
     model = YOLACT.gen()
     
@@ -143,7 +143,7 @@ def main(argv):
     # Choose the Optimizor, Loss Function, and Metrics, learning rate schedule
     logging.info("Initiate the Optimizer and Loss function...")
     lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=FLAGS.lr)
-    HP_OPTIMIZER = hp.HParam('optimizer', hp.Discrete([ 'RMSprop', 'Adam' ]))
+    HP_OPTIMIZER = hp.HParam('optimizer', hp.Discrete([ 'RMSprop' ]))
 
     criterion = loss_yolact.YOLACTLoss()
     train_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
@@ -289,6 +289,10 @@ def main(argv):
                 if trainer.val_metric.result() < best_val:
                     best_val = trainer.val_metric.result()
                     model.save_weights('./weights/weights_' + str(trainer.val_metric.result().numpy()) + '.h5')
+                    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+                    tflite_model = converter.convert()
+                    with tf.io.gfile.GFile('./weights/yolact_' + str(trainer.val_metric.result().numpy()) + '.tflite', 'wb') as F:
+                        F.write(tflite_model)
 
         # Reset All States
         trainer.reset_states()

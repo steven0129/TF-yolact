@@ -51,10 +51,9 @@ class ProtoNet(tf.keras.layers.Layer):
 
     def __init__(self, num_prototype):
         super(ProtoNet, self).__init__()
-        # self.conv_dw = DwConv(num_filters=160)
-        self.conv_base = [DwConv(num_filters=160, dropout=0.1) for _ in range(3)]
+        self.conv_base = [DwConv(num_filters=256, dropout=0.1) for _ in range(3)]
         self.upSampling = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')
-        self.conv_up = [DwConv(num_filters=160, dropout=0.1)]
+        self.conv_up = [DwConv(num_filters=256, dropout=0.1)]
         self.conv_final = DwConv(num_filters=num_prototype, dropout=None)
 
     def call(self, x):
