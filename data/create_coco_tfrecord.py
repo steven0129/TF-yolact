@@ -238,8 +238,8 @@ def create_tf_horizontal_flip_example(image,
         elif category_id == 1 and not dp_triggered:
             continue
         else:
-            xmin.append(1 - float(x) / image_width)  # Xmin Horizontal Flip
-            xmax.append(1 - float(x + width) / image_width)   # Xmax Horizontal Flip
+            xmax.append(1 - float(x) / image_width)  # Xmin Horizontal Flip --> Xmax
+            xmin.append(1 - float(x + width) / image_width)   # Xmax Horizontal Flip --> Xmin
             ymin.append(float(y) / image_height)
             ymax.append(float(y + height) / image_height)
             is_crowd.append(object_annotations['iscrowd'])
