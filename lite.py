@@ -9,6 +9,7 @@ import tensorflow as tf
 from layers.fpn import FeaturePyramidNeck
 from layers.head import PredictionModule
 from layers.protonet import ProtoNet
+from layers.pretrained import MobileNetV2
 from utils.create_prior import make_priors
 
 assert tf.__version__.startswith('2')
@@ -19,15 +20,10 @@ class MyYolact():
         # use pre-trained MobileNetV2
         self.input_shape = (input_size, input_size, 3)
         out = ['block_5_add', 'block_9_add', 'block_14_add']
-        base_model = tf.keras.applications.MobileNetV2(input_shape=self.input_shape, include_top=False, layers=tf.keras.layers, weights='imagenet')
-        base_model.trainable = True
-        
-        with open('base_model.txt', 'w') as F:
-            base_model.summary(print_fn=lambda x: F.write(x + '\n'))
-        
+        self.backbone_pretrained = MobileNetV2(input_shape=(self.input_shape)).gen()
+        self.backbone_pretrained.trainable = True
+
         # extract certain feature maps for FPN
-        self.backbone_resnet = tf.keras.Model(inputs=base_model.input,
-                                              outputs=[base_model.get_layer(x).output for x in out])
         self.backbone_fpn = FeaturePyramidNeck(fpn_channels)
         self.protonet = ProtoNet(num_mask)
 
@@ -46,7 +42,7 @@ class MyYolact():
 
     def gen(self):
         inputs = tf.keras.Input(shape=self.input_shape)
-        c3, c4, c5 = self.backbone_resnet(inputs)
+        c3, c4, c5 = self.backbone_pretrained(inputs)
         fpn_out = self.backbone_fpn(c3, c4, c5)
         p3 = fpn_out[0]
 
