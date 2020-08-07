@@ -56,9 +56,18 @@ class PredictionModule(tf.keras.layers.Layer):
         print(f'num_mask = {self.num_mask}')
 
         self.input_conv = DwConv(num_filters=out_channels, dropout=0.1)
-        self.class_head = DwConv(num_filters=num_class * num_anchors, dropout=0.1)
-        self.box_head = DwConv(num_filters=4 * num_anchors, dropout=0.1)
-        self.mask_head = DwConv(num_filters=num_mask * num_anchors, dropout=0.1)
+        
+        # Class Branch
+        self.class_heads = [DwConv(num_filters=num_class * num_anchors, dropout=0.1) for i in range(1)]
+        self.class_out = DwConv(num_filters=num_class * num_anchors, dropout=None)
+        
+        # Box Branch
+        self.box_heads = [DwConv(num_filters=4 * num_anchors, dropout=0.1) for i in range(1)]
+        self.box_out = DwConv(num_filters=4 * num_anchors, dropout=None)
+        
+        # Mask Branch
+        self.mask_heads = [DwConv(num_filters=num_mask * num_anchors, dropout=0.1) for i in range(1)]
+        self.mask_out = DwConv(num_filters=num_mask * num_anchors, dropout=None)
 
         self.classReshape = tf.keras.layers.Reshape((-1, num_class))
         self.boxReshape = tf.keras.layers.Reshape((-1, 4))
@@ -66,9 +75,23 @@ class PredictionModule(tf.keras.layers.Layer):
 
     def call(self, p):
         p = self.input_conv(p)
-        pred_class = self.class_head(p)
-        pred_box = self.box_head(p)
-        pred_mask = self.mask_head(p)
+        
+        pred_class = p
+        pred_box = p
+        pred_mask = p
+
+        for class_head in self.class_heads:
+            pred_class = class_head(pred_class)
+
+        for box_head in self.box_heads:
+            pred_box = box_head(pred_box)
+
+        for mask_head in self.mask_heads:
+            pred_mask = mask_head(pred_mask)
+
+        pred_class = self.class_out(pred_class)
+        pred_box = self.box_out(pred_box)
+        pred_mask = self.mask_out(pred_mask)
 
         # reshape the prediction head result for following loss calculation
         pred_class = self.classReshape(pred_class)
