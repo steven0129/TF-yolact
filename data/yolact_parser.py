@@ -93,7 +93,7 @@ class Parser(object):
         # resize mask
         masks = tf.expand_dims(masks, axis=-1)
         masks = tf.image.resize(masks, [self._proto_output_size, self._proto_output_size],
-                                method=tf.image.ResizeMethod.BILINEAR)
+                                method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         masks = tf.cast(masks + 0.5, tf.int64)
         masks = tf.squeeze(masks)
         masks = tf.cast(masks, tf.float32)
@@ -185,7 +185,7 @@ class Parser(object):
         masks = tf.expand_dims(masks, axis=-1)
         # using nearest neighbor to make sure the mask still in binary
         masks = tf.image.resize(masks, [self._proto_output_size, self._proto_output_size],
-                                method=tf.image.ResizeMethod.BILINEAR)
+                                method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         masks = tf.cast(masks + 0.5, tf.int64)
         masks = tf.squeeze(tf.cast(masks, tf.float32))
 

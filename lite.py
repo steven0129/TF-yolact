@@ -76,7 +76,13 @@ class MyYolact():
         return model
 
 if __name__ == '__main__':
-    YOLACT = MyYolact(input_size=256, fpn_channels=256, feature_map_size=[69, 35, 18, 9, 5], num_class=10, num_mask=32, aspect_ratio=[1, 0.5, 2], scales=[24, 48, 96, 192, 384])
+    YOLACT = MyYolact(input_size=320,
+                    fpn_channels=256,
+                    feature_map_size=[32, 16, 8, 4, 2],
+                    num_class=13, # 12 classes + 1 background
+                    num_mask=64,
+                    aspect_ratio=[1, 0.5, 2],
+                    scales=[24 * 2, 48 * 2, 96 * 2, 192 * 2, 384 * 2])
     model = YOLACT.gen()
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     tflite_model = converter.convert()

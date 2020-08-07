@@ -17,7 +17,7 @@ from data import yolact_parser
 def prepare_dataloader(tfrecord_dir, batch_size, img_size, subset="train"):
 
     anchorobj = anchor.Anchor(img_size=img_size,
-                              feature_map_size=[32, 16, 8, 4, 2],
+                              feature_map_size=[40, 20, 10, 5, 3],
                               aspect_ratio=[1, 0.5, 2],
                               scale=[24 * 2, 48 * 2, 96 * 2, 192 * 2, 384 * 2])
 
@@ -25,7 +25,7 @@ def prepare_dataloader(tfrecord_dir, batch_size, img_size, subset="train"):
                                   anchor_instance=anchorobj,
                                   match_threshold=0.5,
                                   unmatched_threshold=0.5,
-                                  proto_output_size=64,
+                                  proto_output_size=80,
                                   mode=subset)
     files = tf.io.matching_files(os.path.join(tfrecord_dir, "coco_%s.*" % subset))
     num_shards = tf.cast(tf.shape(files)[0], tf.int64)
