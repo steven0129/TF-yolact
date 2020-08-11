@@ -143,7 +143,7 @@ def main(argv):
     # Choose the Optimizor, Loss Function, and Metrics, learning rate schedule
     logging.info("Initiate the Optimizer and Loss function...")
     lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=FLAGS.lr)
-    HP_OPTIMIZER = hp.HParam('optimizer', hp.Discrete([ 'RMSprop' ]))
+    HP_OPTIMIZER = hp.HParam('optimizer', hp.Discrete([ 'SGD' ]))
 
     criterion = loss_yolact.YOLACTLoss()
     train_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
@@ -186,8 +186,7 @@ def main(argv):
         }
 
         optimizer_map = {
-            'RMSprop': tf.keras.optimizers.RMSprop(learning_rate=lr_schedule, momentum=FLAGS.momentum),
-            'Adam': tf.keras.optimizers.Adam(learning_rate=lr_schedule)
+            'SGD': tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=FLAGS.momentum)
         }
 
         optimizer = optimizer_map[hparams[HP_OPTIMIZER]]

@@ -95,13 +95,12 @@ class MobileNetV2():
 
             if idx + 1 == 9:
                 c4 = x
-
-            if idx + 1 == 14:
-                c5 = x
         
         x = self.final_conv(x)
         x = self.final_conv_bn(x)
         x = self.final_conv_relu(x)
+
+        c5 = x
 
         model = tf.keras.Model(inputs=inputs, outputs=[c3, c4, c5])
         return model
