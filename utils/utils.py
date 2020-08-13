@@ -209,7 +209,7 @@ def postprocess(detection, w, h, batch_idx, intepolation_mode="bilinear", crop_m
     masks = crop(pred_mask, boxes)
 
     # intepolate to original size (test 550*550 here)
-    masks = tf.image.resize(tf.expand_dims(masks, axis=-1), [256, 256],
+    masks = tf.image.resize(tf.expand_dims(masks, axis=-1), [w, h],
                             method=intepolation_mode)
     masks = tf.cast(masks + 0.5, tf.int64)
     masks = tf.squeeze(tf.cast(masks, tf.float32))
