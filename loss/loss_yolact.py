@@ -2,7 +2,6 @@ import tensorflow as tf
 import time
 from utils import utils
 
-
 class YOLACTLoss(object):
 
     def __init__(self, loss_weight_cls=1,
@@ -17,6 +16,8 @@ class YOLACTLoss(object):
         self._loss_weight_seg = loss_seg
         self._neg_pos_ratio = neg_pos_ratio
         self._max_masks_for_train = max_masks_for_train
+        self.focal_loss_alpha = 0.25
+        self.focal_loss_gamma = 2
 
     def __call__(self, pred, label, num_classes):
         """
@@ -45,7 +46,8 @@ class YOLACTLoss(object):
 
         # calculate num_pos
         loc_loss = self._loss_location(pred_offset, box_targets, positiveness) * self._loss_weight_box
-        conf_loss = self._loss_class(pred_cls, cls_targets, num_classes, positiveness) * self._loss_weight_cls
+        # conf_loss = self._loss_class(pred_cls, cls_targets, num_classes, positiveness) * self._loss_weight_cls
+        conf_loss = self._focal_conf_loss(pred_cls, cls_targets, num_classes)
         mask_loss = self._loss_mask(proto_out, pred_mask_coef, bbox_norm, masks, positiveness, max_id_for_anchors,
                                     max_masks_for_train=100) * self._loss_weight_mask
         seg_loss = self._loss_semantic_segmentation(seg, masks, classes, num_obj) * self._loss_weight_seg
@@ -118,8 +120,26 @@ class YOLACTLoss(object):
         target_labels = tf.one_hot(tf.squeeze(target_labels), depth=num_cls)
 
         # loss
-        loss_conf = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(target_labels, target_logits)) / tf.cast(
-            num_pos, tf.float32)
+        loss_conf = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(target_labels, target_logits)) / tf.cast(num_pos, tf.float32)
+
+        return loss_conf
+
+    def _focal_conf_loss(self, pred_cls, gt_cls, num_cls):
+        pred_cls = tf.reshape(pred_cls, [-1, num_cls])  # [batch * num_anchor, num_cls]
+        gt_cls = tf.reshape(gt_cls, [-1])  # [batch * num_anchor]
+
+        keep = tf.cast(gt_cls >= 0, tf.float32)
+        gt_cls = tf.nn.relu(gt_cls)  # remove negative value
+        
+        logpt = tf.nn.log_softmax(pred_cls, axis=-1)
+        logpt = tf.gather(logpt, tf.expand_dims(gt_cls, axis=-1))
+        logpt = tf.reshape(logpt, [-1])
+        pt = tf.exp(logpt)
+
+        background = tf.cast(gt_cls == 0, dtype=tf.float32)
+        at = (1 - self.focal_loss_alpha) * background + self.focal_loss_alpha * (1 - background)
+        loss_conf = -at * (1 - pt) ** self.focal_loss_gamma * logpt
+        loss_conf = tf.reduce_sum(loss_conf * keep)
 
         return loss_conf
 
