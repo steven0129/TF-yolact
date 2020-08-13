@@ -47,12 +47,21 @@ flags.DEFINE_float('save_interval', 10000,
 flags.DEFINE_float('valid_iter', 5000,
                    'number of iteration between saving validation weights')
 class Trainer():
-    def __init__(self, model, optimizer, loss_fn, train_metric, val_metric):
+    def __init__(self, model, optimizer):
         self.model = model
         self.optimizer = optimizer
         self.loss_fn = loss_fn
-        self.train_metric = train_metric
-        self.val_metric = val_metric
+        self.train_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
+        self.valid_loss = tf.keras.metrics.Mean('valid_loss', dtype=tf.float32)
+        self.criterion = loss_yolact.YOLACTLoss()
+        self.loc = tf.keras.metrics.Mean('loc_loss', dtype=tf.float32)
+        self.conf = tf.keras.metrics.Mean('conf_loss', dtype=tf.float32)
+        self.mask = tf.keras.metrics.Mean('mask_loss', dtype=tf.float32)
+        self.seg = tf.keras.metrics.Mean('seg_loss', dtype=tf.float32)
+        self.v_loc = tf.keras.metrics.Mean('vloc_loss', dtype=tf.float32)
+        self.v_conf = tf.keras.metrics.Mean('vconf_loss', dtype=tf.float32)
+        self.v_mask = tf.keras.metrics.Mean('vmask_loss', dtype=tf.float32)
+        self.v_seg = tf.keras.metrics.Mean('vseg_loss', dtype=tf.float32)
 
     @tf.function
     def train_step(self, image, labels):
@@ -66,11 +75,16 @@ class Trainer():
                 'pred_mask_coef': pred[4]
             }
 
-            loc_loss, conf_loss, mask_loss, seg_loss, total_loss = self.loss_fn(output, labels, 13)
+            loc_loss, conf_loss, mask_loss, seg_loss, total_loss = self.criterion(output, labels, 13)
         
         grads = tape.gradient(total_loss, self.model.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables)) 
-        self.train_metric.update_state(total_loss)
+        self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+
+        self.loc.update_state(loc_loss)
+        self.conf.update_state(conf_loss)
+        self.mask.update_state(mask_loss)
+        self.seg.update_state(seg_loss)
+        self.train_loss.update_state(total_loss)
         
         return loc_loss, conf_loss, mask_loss, seg_loss
 
@@ -85,13 +99,26 @@ class Trainer():
             'pred_mask_coef': pred[4]
         }
 
-        loc_loss, conf_loss, mask_loss, seg_loss, total_loss = self.loss_fn(output, labels, 13)
-        self.val_metric.update_state(total_loss)
+        loc_loss, conf_loss, mask_loss, seg_loss, total_loss = self.criterion(output, labels, 13)
+
+        self.v_loc.update_state(loc_loss)
+        self.v_conf.update_state(conf_loss)
+        self.v_mask.update_state(mask_loss)
+        self.v_seg.update_state(seg_loss)
+        self.valid_loss.update_state(total_loss)
         return loc_loss, conf_loss, mask_loss, seg_loss
 
     def reset_states(self):
-        self.train_metric.reset_states()
-        self.val_metric.reset_states()
+        self.train_loss.reset_states()
+        self.valid_loss.reset_states()
+        self.loc.reset_states()
+        self.conf.reset_states()
+        self.mask.reset_states()
+        self.seg.reset_states()
+        self.v_loc.reset_states()
+        self.v_conf.reset_states()
+        self.v_mask.reset_states()
+        self.v_seg.reset_states()
 
 def main(argv):
     # set up Grappler for graph optimization
@@ -144,18 +171,8 @@ def main(argv):
     logging.info("Initiate the Optimizer and Loss function...")
     lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=FLAGS.lr)
     HP_OPTIMIZER = hp.HParam('optimizer', hp.Discrete([ 'SGD' ]))
-
-    criterion = loss_yolact.YOLACTLoss()
-    train_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
-    valid_loss = tf.keras.metrics.Mean('valid_loss', dtype=tf.float32)
-    loc = tf.keras.metrics.Mean('loc_loss', dtype=tf.float32)
-    conf = tf.keras.metrics.Mean('conf_loss', dtype=tf.float32)
-    mask = tf.keras.metrics.Mean('mask_loss', dtype=tf.float32)
-    seg = tf.keras.metrics.Mean('seg_loss', dtype=tf.float32)
-    v_loc = tf.keras.metrics.Mean('vloc_loss', dtype=tf.float32)
-    v_conf = tf.keras.metrics.Mean('vconf_loss', dtype=tf.float32)
-    v_mask = tf.keras.metrics.Mean('vmask_loss', dtype=tf.float32)
-    v_seg = tf.keras.metrics.Mean('vseg_loss', dtype=tf.float32)
+    
+    
 
     with tf.summary.create_file_writer('logs/hparam_tuning').as_default():
         hp.hparams_config(
@@ -206,7 +223,7 @@ def main(argv):
             logging.info("Initializing from scratch.")
 
         # Prepare Trainer
-        trainer = Trainer(model, optimizer, criterion, train_loss, valid_loss)
+        trainer = Trainer(model, optimizer)
 
         best_val = 1e10
         iterations = checkpoint.step.numpy()
@@ -218,27 +235,24 @@ def main(argv):
 
             checkpoint.step.assign_add(1)
             iterations += 1
-            loc_loss, conf_loss, mask_loss, seg_loss = trainer.train_step(image, labels)
-            loc.update_state(loc_loss)
-            conf.update_state(conf_loss)
-            mask.update_state(mask_loss)
-            seg.update_state(seg_loss)
+            trainer.train_step(image, labels)
             
             with train_summary_writer.as_default():
-                tf.summary.scalar('Total loss', trainer.train_metric.result(), step=iterations)
-                tf.summary.scalar('Loc loss', loc.result(), step=iterations)
-                tf.summary.scalar('Conf loss', conf.result(), step=iterations)
-                tf.summary.scalar('Mask loss', mask.result(), step=iterations)
-                tf.summary.scalar('Seg loss', seg.result(), step=iterations)
+                tf.summary.scalar('Total loss', trainer.train_loss.result(), step=iterations)
+                tf.summary.scalar('Loc loss', trainer.loc.result(), step=iterations)
+                tf.summary.scalar('Conf loss', trainer.conf.result(), step=iterations)
+                tf.summary.scalar('Mask loss', trainer.mask.result(), step=iterations)
+                tf.summary.scalar('Seg loss', trainer.seg.result(), step=iterations)
 
             if iterations and iterations % FLAGS.print_interval == 0:
                 logging.info("Iteration {}, LR: {}, Total Loss: {}, B: {},  C: {}, M: {}, S:{} ".format(
                     iterations,
                     optimizer._decayed_lr(var_dtype=tf.float32),
-                    trainer.train_metric.result(), loc.result(),
-                    conf.result(),
-                    mask.result(),
-                    seg.result()
+                    trainer.train_loss.result(),
+                    trainier.loc.result(),
+                    trainer.conf.result(),
+                    trainer.mask.result(),
+                    trainer.seg.result()
                 ))
 
             if iterations and iterations % FLAGS.save_interval == 0:
@@ -251,62 +265,48 @@ def main(argv):
                     if valid_iter > FLAGS.valid_iter:
                         break
                     # calculate validation loss
-                    valid_loc_loss, valid_conf_loss, valid_mask_loss, valid_seg_loss = trainer.valid_step(image, labels)
-                    v_loc.update_state(valid_loc_loss)
-                    v_conf.update_state(valid_conf_loss)
-                    v_mask.update_state(valid_mask_loss)
-                    v_seg.update_state(valid_seg_loss)
+                    trainer.valid_step(image, labels)
                     valid_iter += 1
 
                 with test_summary_writer.as_default():
-                    tf.summary.scalar('V Total loss', trainer.val_metric.result(), step=iterations)
-                    tf.summary.scalar('V Loc loss', v_loc.result(), step=iterations)
-                    tf.summary.scalar('V Conf loss', v_conf.result(), step=iterations)
-                    tf.summary.scalar('V Mask loss', v_mask.result(), step=iterations)
-                    tf.summary.scalar('V Seg loss', v_seg.result(), step=iterations)
+                    tf.summary.scalar('V Total loss', trainer.valid_loss.result(), step=iterations)
+                    tf.summary.scalar('V Loc loss', trainer.v_loc.result(), step=iterations)
+                    tf.summary.scalar('V Conf loss', trainer.v_conf.result(), step=iterations)
+                    tf.summary.scalar('V Mask loss', trainer.v_mask.result(), step=iterations)
+                    tf.summary.scalar('V Seg loss', trainer.v_seg.result(), step=iterations)
 
 
                 with tf.summary.create_file_writer(f'logs/hparam_tuning/trial-{trial_idx}').as_default():
                     hp.hparams(hparams)
-                    tf.summary.scalar('train_loss', trainer.train_metric.result(), step=iterations)
-                    tf.summary.scalar('valid_loss', trainer.val_metric.result(), step=iterations)
+                    tf.summary.scalar('train_loss', trainer.train_loss.result(), step=iterations)
+                    tf.summary.scalar('valid_loss', trainer.valid_loss.result(), step=iterations)
 
                 train_template = 'Iteration {}, Train Loss: {}, Loc Loss: {},  Conf Loss: {}, Mask Loss: {}, Seg Loss: {}'
                 valid_template = 'Iteration {}, Valid Loss: {}, V Loc Loss: {},  V Conf Loss: {}, V Mask Loss: {}, Seg Loss: {}'
+                
                 logging.info(train_template.format(iterations + 1,
-                                            trainer.train_metric.result(),
-                                            loc.result(),
-                                            conf.result(),
-                                            mask.result(),
-                                            seg.result()))
+                                            trainer.train_loss.result(),
+                                            trainer.loc.result(),
+                                            trainer.conf.result(),
+                                            trainer.mask.result(),
+                                            trainer.seg.result()))
+                
                 logging.info(valid_template.format(iterations + 1,
-                                            trainer.val_metric.result(),
-                                            v_loc.result(),
-                                            v_conf.result(),
-                                            v_mask.result(),
-                                            v_seg.result()))
-                if trainer.val_metric.result() < best_val:
-                    best_val = trainer.val_metric.result()
-                    model.save_weights('./weights/weights_' + str(trainer.val_metric.result().numpy()) + '.h5')
+                                            trainer.valid_loss.result(),
+                                            trainer.v_loc.result(),
+                                            trainer.v_conf.result(),
+                                            trainer.v_mask.result(),
+                                            trainer.v_seg.result()))
+                
+                if trainer.valid_loss.result() < best_val:
+                    best_val = trainer.valid_loss.result()
+                    model.save_weights('./weights/weights_' + str(trainer.valid_loss.result().numpy()) + '.h5')
                     converter = tf.lite.TFLiteConverter.from_keras_model(model)
                     tflite_model = converter.convert()
-                    with tf.io.gfile.GFile('./weights/yolact_' + str(trainer.val_metric.result().numpy()) + '.tflite', 'wb') as F:
+                    with tf.io.gfile.GFile('./weights/yolact_' + str(trainer.valid_loss.result().numpy()) + '.tflite', 'wb') as F:
                         F.write(tflite_model)
 
-        # Reset All States
         trainer.reset_states()
-        
-        loc.reset_states()
-        conf.reset_states()
-        mask.reset_states()
-        seg.reset_states()
-        
-        v_loc.reset_states()
-        v_conf.reset_states()
-        v_mask.reset_states()
-        v_seg.reset_states()
-
-            
 
 if __name__ == '__main__':
     app.run(main)
