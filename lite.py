@@ -16,10 +16,8 @@ assert tf.__version__.startswith('2')
 
 class MyYolact():
     def __init__(self, input_size, fpn_channels, feature_map_size, num_class, num_mask, aspect_ratio, scales):
-        out = ['conv3_block4_out', 'conv4_block6_out', 'conv5_block3_out']
         # use pre-trained MobileNetV2
         self.input_shape = (input_size, input_size, 3)
-        out = ['block_5_add', 'block_9_add', 'block_14_add']
         self.backbone_pretrained = MobileNetV2(input_shape=(self.input_shape)).gen()
         self.backbone_pretrained.trainable = True
 
@@ -42,8 +40,8 @@ class MyYolact():
 
     def gen(self):
         inputs = tf.keras.Input(shape=self.input_shape)
-        c3, c4, c5 = self.backbone_pretrained(inputs)
-        fpn_out = self.backbone_fpn(c3, c4, c5)
+        c2, c3, c4, c5 = self.backbone_pretrained(inputs)
+        fpn_out = self.backbone_fpn(c2, c3, c4, c5)
         p3 = fpn_out[0]
 
         # Protonet Branch
@@ -72,14 +70,18 @@ class MyYolact():
         return model
 
 if __name__ == '__main__':
-    YOLACT = MyYolact(input_size=320,
-                    fpn_channels=256,
-                    feature_map_size=[32, 16, 8, 4, 2],
-                    num_class=13, # 12 classes + 1 background
-                    num_mask=64,
-                    aspect_ratio=[1, 0.5, 2],
-                    scales=[24 * 2, 48 * 2, 96 * 2, 192 * 2, 384 * 2])
+    YOLACT = MyYolact(
+        input_size=320,
+        fpn_channels=256, 
+        feature_map_size=[80, 40, 20, 10, 5, 3],
+        num_class=13, # 12 classes + 1 background
+        num_mask=32,
+        aspect_ratio=[1, 0.5, 2],
+        scales=[12, 24, 48, 96, 192, 384]
+    )
+
     model = YOLACT.gen()
+    model.save('yolact.h5')
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     tflite_model = converter.convert()
     with tf.io.gfile.GFile('yolact.tflite', 'wb') as F:

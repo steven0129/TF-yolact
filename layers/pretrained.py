@@ -53,6 +53,7 @@ class MobileNetV2():
 
     def gen(self):
         inputs = tf.keras.Input(shape=self.input_shape)
+        c2 = None
         c3 = None
         c4 = None
         c5 = None
@@ -90,6 +91,9 @@ class MobileNetV2():
             if 'add' in block:
                 x = block['add']([x, block_in])
 
+            if idx + 1 == 2:
+                c2 = x
+
             if idx + 1 == 5:
                 c3 = x
 
@@ -102,7 +106,7 @@ class MobileNetV2():
 
         c5 = x
 
-        model = tf.keras.Model(inputs=inputs, outputs=[c3, c4, c5])
+        model = tf.keras.Model(inputs=inputs, outputs=[c2, c3, c4, c5])
         return model
 
 
@@ -110,7 +114,6 @@ if __name__ == '__main__':
     dummy_input = tf.zeros((8, 320, 320, 3))
     model = MobileNetV2(input_shape=(320, 320, 3)).gen()
     model.summary()
-    out = ['block_5_add', 'block_9_add', 'block_14_add']
 
     y = model(dummy_input, training=False)
     tf.print(tf.shape(y[0]))
