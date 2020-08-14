@@ -42,13 +42,13 @@ class MyYolact():
         inputs = tf.keras.Input(shape=self.input_shape)
         c2, c3, c4, c5 = self.backbone_pretrained(inputs)
         fpn_out = self.backbone_fpn(c2, c3, c4, c5)
-        p3 = fpn_out[0]
+        p2 = fpn_out[0]
 
         # Protonet Branch
-        protonet_out = self.protonet(p3)
+        protonet_out = self.protonet(p2)
 
         # Semantic Segmentation Branch
-        seg = self.semantic_segmentation(p3)
+        seg = self.semantic_segmentation(p2)
 
         # Prediction Head Branch
         all_pred_cls = []
