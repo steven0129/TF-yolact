@@ -90,7 +90,7 @@ class YOLACTLoss(object):
         pos_pred_cls = tf.gather(pred_cls, pos_indices[:, 0])
         pos_gt = tf.gather(gt_cls, pos_indices[:, 0])
 
-        # calculate the needed amount of  negative sample
+        # calculate the needed amount of negative sample
         num_pos = tf.shape(pos_gt)[0]
         num_neg_needed = num_pos * self._neg_pos_ratio
 
@@ -98,10 +98,9 @@ class YOLACTLoss(object):
         neg_gt = tf.gather(gt_cls, neg_indices[:, 0])
 
         # apply softmax on the pred_cls
-        neg_softmax = neg_pred_cls
-
         # -log(softmax class 0)
-        neg_minus_log_class0 = -1 * tf.math.log(neg_softmax[:, 0])
+        # neg_minus_log_class0 = -1 * tf.math.log(neg_softmax[:, 0])
+        neg_minus_log_class0 = -1 * tf.nn.log_softmax(neg_pred_cls)[:, 0]
 
         # sort of -log(softmax class 0)
         neg_minus_log_class0_sort = tf.argsort(neg_minus_log_class0, direction="DESCENDING")
@@ -151,6 +150,28 @@ class YOLACTLoss(object):
         class_loss = tf.nn.softmax_cross_entropy_with_logits(pred_data_positive, gt_cls_positive)
 
         return tf.reduce_sum(tf.reduce_sum(class_loss) + tf.reduce_sum(obj_loss * keep))
+
+    # def _ohem_conf_loss(self, pred_cls, gt_cls, num_cls, positiveness):
+    #     # reshape gt_cls from [batch, num_anchor] => [batch * num_anchor, 1]
+    #     gt_cls = tf.expand_dims(gt_cls, axis=-1)
+    #     gt_cls = tf.reshape(gt_cls, [-1, 1])
+
+    #     # Compute max conf across batch for hard negative mining
+    #     pred_cls = tf.reshape(pred_cls, [-1, num_cls])  # [batch * num_anchor, num_cls]
+    #     pred_max = tf.reduce_max(pred_cls)
+    #     loss_c = tf.math.log(tf.reduce_sum(tf.exp(pred_cls - pred_max), axis=1)) + pred_max - pred_cls[:, 0]
+
+    #     # Hard Negative Mining
+    #     loss_c = tf.expand_dims(loss_c, axis=-1)   # [batch * num_anchor, 1]
+    #     positiveness = tf.expand_dims(positiveness, axis=-1)  # [batch * num_anchor, 1]
+    #     pos_indices = tf.where(positiveness == 1)  # Index of positiveness
+    #     loss_c = tf.tensor_scatter_nd_update(loss_c, pos_indices, tf.zeros(tf.shape(pos_indices)[0]))  # filter out positive boxes
+
+    #     gt_neg_indices = tf.where(gt_cls < 0)  # Index of gt < 0
+    #     loss_c = tf.tensor_scatter_nd_update(loss_c, gt_neg_indices, tf.zeros(tf.shape(gt_neg_indices)[0]))  # Filter out neutrals
+
+    #     num_pos = tf.reduce_sum(positiveness, axis=1, keepdims=True)
+    #     num_neg = 
 
     def _loss_mask(self, proto_output, pred_mask_coef, gt_bbox_norm, gt_masks, positiveness,
                    max_id_for_anchors, max_masks_for_train):
