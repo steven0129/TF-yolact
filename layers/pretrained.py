@@ -53,7 +53,6 @@ class MobileNetV2():
 
     def gen(self):
         inputs = tf.keras.Input(shape=self.input_shape)
-        c2 = None
         c3 = None
         c4 = None
         c5 = None
@@ -72,32 +71,16 @@ class MobileNetV2():
         x = self.dropout2(x)
 
         for idx, block in enumerate(self.blocks):
-            block_in = x
-            x = block['expand'](x)
-            x = block['expand_bn'](x)
-            x = block['expand_relu'](x)
-
-            if 'padding' in block:
-                x = block['padding'](x)
-
-            x = block['conv_dw'](x)
-            x = block['conv_dw_bn'](x)
-            x = block['conv_dw_relu'](x)
-
-            x = block['project'](x)
-            x = block['project_bn'](x)
-            x = block['dropout'](x)
-
-            if 'add' in block:
-                x = block['add']([x, block_in])
-
-            if idx + 1 == 2:
-                c2 = x
+            x = self.parse_block(block, x)
 
             if idx + 1 == 5:
+                x = self.parse_block(block, x)
+                x = self.parse_block(block, x)
                 c3 = x
 
             if idx + 1 == 9:
+                x = self.parse_block(block, x)
+                x = self.parse_block(block, x)
                 c4 = x
         
         x = self.final_conv(x)
@@ -106,8 +89,30 @@ class MobileNetV2():
 
         c5 = x
 
-        model = tf.keras.Model(inputs=inputs, outputs=[c2, c3, c4, c5])
+        model = tf.keras.Model(inputs=inputs, outputs=[c3, c4, c5])
         return model
+
+    def parse_block(self, block, x):
+        block_in = x
+        x = block['expand'](x)
+        x = block['expand_bn'](x)
+        x = block['expand_relu'](x)
+
+        if 'padding' in block:
+            x = block['padding'](x)
+
+        x = block['conv_dw'](x)
+        x = block['conv_dw_bn'](x)
+        x = block['conv_dw_relu'](x)
+
+        x = block['project'](x)
+        x = block['project_bn'](x)
+        x = block['dropout'](x)
+
+        if 'add' in block:
+            x = block['add']([x, block_in])
+
+        return x
 
 
 if __name__ == '__main__':

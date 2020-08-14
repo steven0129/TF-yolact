@@ -54,9 +54,6 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         self.upSample = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')
 
         # no Relu for downsample layer
-        self.downSample0 = tf.keras.layers.Conv2D(num_fpn_filters, (3, 3), 2, padding="same",
-                                                  kernel_initializer=tf.keras.initializers.glorot_uniform())
-
         self.downSample1 = tf.keras.layers.Conv2D(num_fpn_filters, (3, 3), 2, padding="same",
                                                   kernel_initializer=tf.keras.initializers.glorot_uniform())
 
@@ -84,15 +81,13 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         self.dropout7 = tf.keras.layers.Dropout(0.1)
 
 
-    def call(self, c2, c3, c4, c5):
+    def call(self, c3, c4, c5):
         # lateral conv for c3 c4 c5
         p5 = self.lateralCov1(c5)
         p4 = self._crop_and_add(self.upSample(p5), self.lateralCov2(c4))
         p3 = self._crop_and_add(self.upSample(p4), self.lateralCov3(c3))
-        p2 = self._crop_and_add(self.upSample(p3), self.lateralCov4(c2))
 
         # smooth pred layer for p3, p4, p5
-        p2 = self.predictP2(p2)
         p3 = self.predictP3(p3)
         p4 = self.predictP4(p4)
         p5 = self.predictP5(p5)
@@ -103,7 +98,7 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         p7 = self.downSample2(p6)
         p7 = self.dropout7(p7)
 
-        return [p2, p3, p4, p5, p6, p7]
+        return [p3, p4, p5, p6, p7]
 
     def _crop_and_add(self, x1, x2):
         """
