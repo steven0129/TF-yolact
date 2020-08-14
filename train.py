@@ -50,7 +50,6 @@ class Trainer():
     def __init__(self, model, optimizer):
         self.model = model
         self.optimizer = optimizer
-        self.loss_fn = loss_fn
         self.train_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
         self.valid_loss = tf.keras.metrics.Mean('valid_loss', dtype=tf.float32)
         self.criterion = loss_yolact.YOLACTLoss()
@@ -249,7 +248,7 @@ def main(argv):
                     iterations,
                     optimizer._decayed_lr(var_dtype=tf.float32),
                     trainer.train_loss.result(),
-                    trainier.loc.result(),
+                    trainer.loc.result(),
                     trainer.conf.result(),
                     trainer.mask.result(),
                     trainer.seg.result()
