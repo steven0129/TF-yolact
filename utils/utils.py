@@ -69,30 +69,37 @@ def map_to_offset(x):
 
 
 # crop the prediction of mask so as to calculate the linear combination mask loss
-def crop(pred, boxes):
+def crop(pred, boxes, origin_w, origin_h):
+    
     pred_shape = tf.shape(pred)
-    w = tf.cast(tf.range(pred_shape[1]), tf.float32)
-    h = tf.expand_dims(tf.cast(tf.range(pred_shape[2]), tf.float32), axis=-1)
+    num_mask, mask_w, mask_h = pred_shape[0], pred_shape[1], pred_shape[2]
+    cols = tf.cast(tf.range(mask_w), tf.float32)
+    rows = tf.expand_dims(tf.cast(tf.range(mask_h), tf.float32), axis=-1)
 
-    cols = tf.broadcast_to(w, pred_shape)
-    rows = tf.broadcast_to(h, pred_shape)
+    cols = tf.broadcast_to(cols, pred_shape)
+    rows = tf.broadcast_to(rows, pred_shape)
 
-    ymin = tf.broadcast_to(tf.reshape(boxes[:, 0], [-1, 1, 1]), pred_shape)
-    xmin = tf.broadcast_to(tf.reshape(boxes[:, 1], [-1, 1, 1]), pred_shape)
-    ymax = tf.broadcast_to(tf.reshape(boxes[:, 2], [-1, 1, 1]), pred_shape)
-    xmax = tf.broadcast_to(tf.reshape(boxes[:, 3], [-1, 1, 1]), pred_shape)
+    ymin = boxes[:, 0] / origin_h * tf.cast(mask_h, tf.float32)
+    xmin = boxes[:, 1] / origin_w * tf.cast(mask_w, tf.float32)
+    ymax = boxes[:, 2] / origin_h * tf.cast(mask_h, tf.float32)
+    xmax = boxes[:, 3] / origin_w * tf.cast(mask_w, tf.float32)
 
+    ymin = tf.broadcast_to(tf.reshape(ymin, [-1, 1, 1]), pred_shape)
+    xmin = tf.broadcast_to(tf.reshape(xmin, [-1, 1, 1]), pred_shape)
+    ymax = tf.broadcast_to(tf.reshape(ymax, [-1, 1, 1]), pred_shape)
+    xmax = tf.broadcast_to(tf.reshape(xmax, [-1, 1, 1]), pred_shape)
+
+    mask_top = (rows >= ymin)
+    mask_bottom = (rows < ymax)
     mask_left = (cols >= xmin)
-    mask_right = (cols <= xmax)
-    mask_bottom = (rows >= ymin)
-    mask_top = (rows <= ymax)
+    mask_right = (cols < xmax)
 
-    crop_mask = tf.math.logical_and(tf.math.logical_and(mask_left, mask_right),
-                                    tf.math.logical_and(mask_bottom, mask_top))
-    crop_mask = tf.cast(crop_mask, tf.float32)
-    # tf.print('crop', tf.shape(crop_mask))
+    mask_top = tf.cast(mask_top, tf.float32)
+    mask_bottom = tf.cast(mask_bottom, tf.float32)
+    mask_left = tf.cast(mask_left, tf.float32)
+    mask_right = tf.cast(mask_right, tf.float32)
 
-    return pred * crop_mask
+    return pred * mask_left * mask_right * mask_bottom * mask_top
 
 
 # decode the offset back to center form bounding box when evaluation and prediction
@@ -205,13 +212,14 @@ def postprocess(detection, w, h, batch_idx, intepolation_mode="bilinear", crop_m
     pred_mask = tf.linalg.matmul(proto_pred, masks, transpose_a=False, transpose_b=True)
     pred_mask = tf.nn.sigmoid(pred_mask)
     pred_mask = tf.transpose(pred_mask, perm=(2, 0, 1))
-    tf.print("pred mask", tf.shape(pred_mask))
-    masks = crop(pred_mask, boxes)
+    masks = crop(pred_mask, boxes, origin_w=320, origin_h=320)
 
     # intepolate to original size (test 550*550 here)
-    masks = tf.image.resize(tf.expand_dims(masks, axis=-1), [w, h],
-                            method=intepolation_mode)
+    masks = tf.image.resize(tf.expand_dims(masks, axis=-1), [w, h], method=intepolation_mode)
+
+    # masks < 0.5 --> 0
+    # masks >= 0.5 --> 1
     masks = tf.cast(masks + 0.5, tf.int64)
-    masks = tf.squeeze(tf.cast(masks, tf.float32))
+    masks = tf.squeeze(masks, axis=-1)
 
     return classes, scores, boxes, masks
