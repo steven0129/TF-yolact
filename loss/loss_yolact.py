@@ -188,7 +188,6 @@ class YOLACTLoss(object):
             bbox_norm = gt_bbox_norm[idx]
             pos = positiveness[idx]
             max_id = max_id_for_anchors[idx]
-
             pos_indices = tf.squeeze(tf.where(pos == 1))
             # tf.print("num_pos", tf.shape(pos_indices))
             """
@@ -206,20 +205,25 @@ class YOLACTLoss(object):
                 pos_mask_coef = tf.expand_dims(pos_mask_coef, axis=0)
                 pos_max_id = tf.expand_dims(pos_max_id, axis=0)
             total_pos += tf.size(pos_indices)
-            # [138, 138, num_pos]
+            
+            # proto = [80, 80, num_mask]
+            # pos_mask_coef = [num_pos, num_mask]
+            # pred_mask = proto x pos_mask_coef = [80, 80, num_pos]
+            # pred_mask transpose = [num_pos, 80, 80]
             pred_mask = tf.linalg.matmul(proto, pos_mask_coef, transpose_a=False, transpose_b=True)
             pred_mask = tf.transpose(pred_mask, perm=(2, 0, 1))
 
             # calculating loss for each mask coef correspond to each postitive anchor
-            gt = tf.gather(mask_gt, pos_max_id)
-            bbox = tf.gather(bbox_norm, pos_max_id)
-            bbox_center = utils.map_to_center_form(bbox)
+            # pos_max_id = [num_pos]
+            gt = tf.gather(mask_gt, pos_max_id)            # [num_pos, 80, 80]
+            bbox = tf.gather(bbox_norm, pos_max_id)        # [num_pos, 4]
+            bbox_center = utils.map_to_center_form(bbox)   # [num_pos, 4]
             area = bbox_center[:, -1] * bbox_center[:, -2]
 
             # crop the pred (not real crop, zero out the area outside the gt box)
-            s = tf.nn.sigmoid_cross_entropy_with_logits(gt, pred_mask)
-            s = utils.crop(s, bbox, origin_w=80, origin_h=80)
-            loss = tf.reduce_sum(s, axis=[1, 2]) / area
+            s = tf.nn.sigmoid_cross_entropy_with_logits(gt, pred_mask)  # [num_pos, 80, 80]
+            s = utils.crop(s, bbox, origin_w=80, origin_h=80)           # [num_pos, 80, 80]
+            loss = tf.reduce_sum(s, axis=[1, 2]) / area                 # [num_pos]
             loss_mask += tf.reduce_sum(loss)
 
         loss_mask /= tf.cast(total_pos, tf.float32)
