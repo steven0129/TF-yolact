@@ -170,8 +170,6 @@ def main(argv):
     logging.info("Initiate the Optimizer and Loss function...")
     lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=FLAGS.lr)
     HP_OPTIMIZER = hp.HParam('optimizer', hp.Discrete([ 'SGD' ]))
-    
-    
 
     with tf.summary.create_file_writer('logs/hparam_tuning').as_default():
         hp.hparams_config(
@@ -202,7 +200,9 @@ def main(argv):
         }
 
         optimizer_map = {
-            'SGD': tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=FLAGS.momentum)
+            'SGD': tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=FLAGS.momentum),
+            'NesterovSGD': tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=FLAGS.momentum, nesterov=True),
+            'Adam': tf.keras.optimizers.Adam(learning_rate=0.001)
         }
 
         optimizer = optimizer_map[hparams[HP_OPTIMIZER]]
