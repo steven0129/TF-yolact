@@ -19,7 +19,7 @@ def prepare_dataloader(tfrecord_dir, batch_size, img_size, subset="train"):
     anchorobj = anchor.Anchor(img_size=img_size,
                               feature_map_size=[40, 20, 10, 5, 3],
                               aspect_ratio=[1, 0.5, 2],
-                              scale=[24 * 2, 48 * 2, 96 * 2, 192 * 2, 384 * 2])
+                              scale=[24 / 4, 48 / 4, 96 / 4, 192 / 4, 384 / 4])
 
     parser = yolact_parser.Parser(output_size=img_size,
                                   anchor_instance=anchorobj,

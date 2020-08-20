@@ -188,7 +188,7 @@ YOLACT = lite.MyYolact(input_size=320,
                num_class=13,
                num_mask=64,
                aspect_ratio=[1, 0.5, 2],
-               scales=[24 * 2, 48 * 2, 96 * 2, 192 * 2, 384 * 2])
+               scales=[24 / 4, 48 / 4, 96 / 4, 192 / 4, 384 / 4])
 
 model = YOLACT.gen()
 
@@ -202,9 +202,9 @@ print("Restore Ckpt Sucessfully!!")
 # Load Validation Images and do Detection
 # -----------------------------------------------------------------------------------------------
 # Need default anchor
-anchorobj = anchor.Anchor(img_size=320, feature_map_size=[40, 20, 10, 5, 3], aspect_ratio=[1, 0.5, 2], scale=[24 * 2, 48 * 2, 96 * 2, 192 * 2, 384 * 2])
+anchorobj = anchor.Anchor(img_size=320, feature_map_size=[40, 20, 10, 5, 3], aspect_ratio=[1, 0.5, 2], scale=[24 / 4, 48 / 4, 96 / 4, 192 / 4, 384 / 4])
 valid_dataset = dataset_coco.prepare_dataloader(img_size=320,
-                                                tfrecord_dir='data/my_tfrecord_320x320',
+                                                tfrecord_dir='data/coco_tfrecord_320x320_hflip',
                                                 batch_size=1,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
