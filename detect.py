@@ -74,7 +74,7 @@ class Detect(object):
         # tf.print(tf.math.bincount(conf_score_id, dtype=tf.dtypes.int64))
 
         # filter out the ROI that have conf score > confidence threshold
-        tf.print(conf_score)
+        tf.print('highest score', tf.reduce_max(conf_score))
         candidate_ROI_idx = tf.squeeze(tf.where(conf_score > self.conf_threshold))
         tf.print("candidate_ROI", tf.shape(candidate_ROI_idx))
 
@@ -194,9 +194,9 @@ YOLACT = lite.MyYolact(input_size=320,
                fpn_channels=256,
                feature_map_size=[40, 20, 10, 5, 3],
                num_class=13,
-               num_mask=64,
+               num_mask=32,
                aspect_ratio=[1, 0.5, 2],
-               scales=[24 / 4, 48 / 4, 96 / 4, 192 / 4, 384 / 4])
+               scales=[24, 48, 96, 192, 384])
 
 model = YOLACT.gen()
 
@@ -210,7 +210,7 @@ print("Restore Ckpt Sucessfully!!")
 # Load Validation Images and do Detection
 # -----------------------------------------------------------------------------------------------
 # Need default anchor
-anchorobj = anchor.Anchor(img_size=320, feature_map_size=[40, 20, 10, 5, 3], aspect_ratio=[1, 0.5, 2], scale=[24 / 4, 48 / 4, 96 / 4, 192 / 4, 384 / 4])
+anchorobj = anchor.Anchor(img_size=320, feature_map_size=[40, 20, 10, 5, 3], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
 valid_dataset = dataset_coco.prepare_dataloader(img_size=320,
                                                 tfrecord_dir='data/coco_tfrecord_320x320_hflip',
                                                 batch_size=1,
@@ -264,9 +264,11 @@ for image, labels in valid_dataset.take(1):
             'Cow'
         ]
 
+        print(remapping[gt_cls[0][idx]])
         cv2.putText(image, remapping[gt_cls[0][idx]], (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_DUPLEX,
                     0.5, (0, 0, 255), 1)
 
+    print('---------------------')
     # show the prediction box
     for idx in range(bbox.shape[0]):
         b = bbox[idx]
