@@ -151,9 +151,9 @@ def main(argv):
                           fpn_channels=256,
                           feature_map_size=[40, 20, 10, 5, 3],
                           num_class=13, # 12 classes + 1 background
-                          num_mask=64,
+                          num_mask=32,
                           aspect_ratio=[1, 0.5, 2],
-                          scales=[24 / 4, 48 / 4, 96 / 4, 192 / 4, 384 / 4])
+                          scales=[24, 48, 96, 192, 384])
 
     model = YOLACT.gen()
     
