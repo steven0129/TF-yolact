@@ -281,29 +281,28 @@ def main(argv):
                     tf.summary.scalar('valid_loss', trainer.valid_loss.result(), step=iterations)
 
                 train_template = 'Iteration {}, Train Loss: {}, Loc Loss: {},  Conf Loss: {}, Mask Loss: {}, Seg Loss: {}'
-                valid_template = 'Iteration {}, Valid Loss: {}, V Loc Loss: {},  V Conf Loss: {}, V Mask Loss: {}, Seg Loss: {}'
+                valid_template = 'Iteration {}, Valid Loss: {}, V Loc Loss: {},  V Conf Loss: {}, V Mask Loss: {}, V Seg Loss: {}'
                 
-                logging.info(train_template.format(iterations + 1,
+                logging.info(train_template.format(iterations,
                                             trainer.train_loss.result(),
                                             trainer.loc.result(),
                                             trainer.conf.result(),
                                             trainer.mask.result(),
                                             trainer.seg.result()))
                 
-                logging.info(valid_template.format(iterations + 1,
+                logging.info(valid_template.format(iterations,
                                             trainer.valid_loss.result(),
                                             trainer.v_loc.result(),
                                             trainer.v_conf.result(),
                                             trainer.v_mask.result(),
                                             trainer.v_seg.result()))
                 
-                if trainer.valid_loss.result() < best_val:
-                    best_val = trainer.valid_loss.result()
-                    model.save_weights('./weights/weights_' + str(trainer.valid_loss.result().numpy()) + '.h5')
-                    converter = tf.lite.TFLiteConverter.from_keras_model(model)
-                    tflite_model = converter.convert()
-                    with tf.io.gfile.GFile('./weights/yolact_' + str(trainer.valid_loss.result().numpy()) + '.tflite', 'wb') as F:
-                        F.write(tflite_model)
+                best_val = trainer.valid_loss.result()
+                model.save_weights('./weights/weights_' + str(iterations) + '.h5')
+                converter = tf.lite.TFLiteConverter.from_keras_model(model)
+                tflite_model = converter.convert()
+                with tf.io.gfile.GFile('./weights/yolact_' + str(iterations) + '.tflite', 'wb') as F:
+                    F.write(tflite_model)
 
         trainer.reset_states()
 
