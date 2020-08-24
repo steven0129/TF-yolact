@@ -90,6 +90,14 @@ class Detect(object):
         masks = tf.gather(mask_pred[batch_idx], candidate_ROI_idx)
         tf.print("masks", tf.shape(masks))
 
+        if tf.shape(tf.shape(boxes))[0] == 1:
+            scores = tf.expand_dims(scores, axis=0)
+            boxes = tf.expand_dims(boxes, axis=0)
+            masks = tf.expand_dims(masks, axis=0)
+            classes = tf.expand_dims(classes, axis=0)
+
+            return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
+
         selected_indices = tf.image.non_max_suppression(boxes, scores, 100, self.nms_threshold)
 
         boxes = tf.gather(boxes, selected_indices)
