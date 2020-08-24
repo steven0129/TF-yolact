@@ -51,6 +51,105 @@ class MobileNetV2():
         self.final_conv_bn = self.base_model.layers[-2]
         self.final_conv_relu = tf.keras.layers.ReLU()
 
+        self.new_blocks = [
+            {
+                'expand': tf.keras.layers.Conv2D(192, kernel_size=1, padding='same', use_bias=False),
+                'expand_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'expand_relu': tf.keras.layers.ReLU(),
+                'conv_dw': tf.keras.layers.DepthwiseConv2D(kernel_size=3, padding='same', strides=1, use_bias=False),
+                'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'conv_dw_relu': tf.keras.layers.ReLU(),
+                'project': tf.keras.layers.Conv2D(32, kernel_size=1, padding='same', use_bias=False),
+                'project_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'dropout': tf.keras.layers.Dropout(dropout),
+                'add': tf.keras.layers.Add()
+            },
+            {
+                'expand': tf.keras.layers.Conv2D(192, kernel_size=1, padding='same', use_bias=False),
+                'expand_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'expand_relu': tf.keras.layers.ReLU(),
+                'conv_dw': tf.keras.layers.DepthwiseConv2D(kernel_size=3, padding='same', strides=1, use_bias=False),
+                'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'conv_dw_relu': tf.keras.layers.ReLU(),
+                'project': tf.keras.layers.Conv2D(32, kernel_size=1, padding='same', use_bias=False),
+                'project_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'dropout': tf.keras.layers.Dropout(dropout),
+                'add': tf.keras.layers.Add()
+            },
+            {
+                'expand': tf.keras.layers.Conv2D(192, kernel_size=1, padding='same', use_bias=False),
+                'expand_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'expand_relu': tf.keras.layers.ReLU(),
+                'conv_dw': tf.keras.layers.DepthwiseConv2D(kernel_size=3, padding='same', strides=1, use_bias=False),
+                'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'conv_dw_relu': tf.keras.layers.ReLU(),
+                'project': tf.keras.layers.Conv2D(32, kernel_size=1, padding='same', use_bias=False),
+                'project_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'dropout': tf.keras.layers.Dropout(dropout),
+                'add': tf.keras.layers.Add()
+            },
+            {
+                'expand': tf.keras.layers.Conv2D(192, kernel_size=1, padding='same', use_bias=False),
+                'expand_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'expand_relu': tf.keras.layers.ReLU(),
+                'conv_dw': tf.keras.layers.DepthwiseConv2D(kernel_size=3, padding='same', strides=1, use_bias=False),
+                'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'conv_dw_relu': tf.keras.layers.ReLU(),
+                'project': tf.keras.layers.Conv2D(32, kernel_size=1, padding='same', use_bias=False),
+                'project_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'dropout': tf.keras.layers.Dropout(dropout),
+                'add': tf.keras.layers.Add()
+            },
+            {
+                'expand': tf.keras.layers.Conv2D(384, kernel_size=1, padding='same', use_bias=False),
+                'expand_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'expand_relu': tf.keras.layers.ReLU(),
+                'conv_dw': tf.keras.layers.DepthwiseConv2D(kernel_size=3, padding='same', strides=1, use_bias=False),
+                'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'conv_dw_relu': tf.keras.layers.ReLU(),
+                'project': tf.keras.layers.Conv2D(64, kernel_size=1, padding='same', use_bias=False),
+                'project_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'dropout': tf.keras.layers.Dropout(dropout),
+                'add': tf.keras.layers.Add()
+            },
+            {
+                'expand': tf.keras.layers.Conv2D(384, kernel_size=1, padding='same', use_bias=False),
+                'expand_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'expand_relu': tf.keras.layers.ReLU(),
+                'conv_dw': tf.keras.layers.DepthwiseConv2D(kernel_size=3, padding='same', strides=1, use_bias=False),
+                'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'conv_dw_relu': tf.keras.layers.ReLU(),
+                'project': tf.keras.layers.Conv2D(64, kernel_size=1, padding='same', use_bias=False),
+                'project_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'dropout': tf.keras.layers.Dropout(dropout),
+                'add': tf.keras.layers.Add()
+            },
+            {
+                'expand': tf.keras.layers.Conv2D(384, kernel_size=1, padding='same', use_bias=False),
+                'expand_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'expand_relu': tf.keras.layers.ReLU(),
+                'conv_dw': tf.keras.layers.DepthwiseConv2D(kernel_size=3, padding='same', strides=1, use_bias=False),
+                'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'conv_dw_relu': tf.keras.layers.ReLU(),
+                'project': tf.keras.layers.Conv2D(64, kernel_size=1, padding='same', use_bias=False),
+                'project_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'dropout': tf.keras.layers.Dropout(dropout),
+                'add': tf.keras.layers.Add()
+            },
+            {
+                'expand': tf.keras.layers.Conv2D(384, kernel_size=1, padding='same', use_bias=False),
+                'expand_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'expand_relu': tf.keras.layers.ReLU(),
+                'conv_dw': tf.keras.layers.DepthwiseConv2D(kernel_size=3, padding='same', strides=1, use_bias=False),
+                'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'conv_dw_relu': tf.keras.layers.ReLU(),
+                'project': tf.keras.layers.Conv2D(64, kernel_size=1, padding='same', use_bias=False),
+                'project_bn': tf.keras.layers.BatchNormalization(axis=-1, epsilon=1e-3, momentum=0.999),
+                'dropout': tf.keras.layers.Dropout(dropout),
+                'add': tf.keras.layers.Add()
+            }
+        ]
+
     def gen(self):
         inputs = tf.keras.Input(shape=self.input_shape)
         c3 = None
@@ -74,13 +173,9 @@ class MobileNetV2():
             x = self.parse_block(block, x)
 
             if idx + 1 == 5:
-                x = self.parse_block(block, x)
-                x = self.parse_block(block, x)
                 c3 = x
 
             if idx + 1 == 9:
-                x = self.parse_block(block, x)
-                x = self.parse_block(block, x)
                 c4 = x
         
         x = self.final_conv(x)

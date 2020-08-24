@@ -51,10 +51,16 @@ class ProtoNet(tf.keras.layers.Layer):
 
     def __init__(self, num_prototype):
         super(ProtoNet, self).__init__()
-        self.conv_base = [DwConv(num_filters=256, dropout=0.1) for _ in range(3)]
+        
+        self.conv_base = [
+                tf.keras.layers.Conv2D(256, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform(), activation="relu"),
+                tf.keras.layers.Conv2D(256, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform(), activation="relu"),
+                tf.keras.layers.Conv2D(256, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform(), activation="relu")
+        ]
+
         self.upSampling = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')
-        self.conv_up = [DwConv(num_filters=256, dropout=0.1)]
-        self.conv_final = DwConv(num_filters=num_prototype, dropout=None)
+        self.conv_up = [tf.keras.layers.Conv2D(256, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform(), activation="relu")]
+        self.conv_final = tf.keras.layers.Conv2D(num_prototype, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform(), activation="relu")
 
     def call(self, x):
         for conv in self.conv_base:
