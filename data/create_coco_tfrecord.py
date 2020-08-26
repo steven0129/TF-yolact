@@ -363,12 +363,35 @@ def create_tf_example(image,
         encoded_jpg = fid.read()
     encoded_jpg_io = io.BytesIO(encoded_jpg)
     image = PIL.Image.open(encoded_jpg_io)
+    origin_image = image
+
+    
+
     r = 320
     image = image.resize((r, r), PIL.Image.ANTIALIAS)
     bytes_io = io.BytesIO()
     image.save(bytes_io, format='JPEG')
     encoded_jpg = bytes_io.getvalue()
     key = hashlib.sha256(encoded_jpg).hexdigest()
+
+    # Label Remapping
+    # Background --> 0
+    remapping = {
+        # Person --> Person Face & Person Body
+        -1: 1,  # Person Face
+        -2: 2,  # Person Body
+        2: 3, # Bicycle
+        3: 4, # Car -> Car
+        6: 4, # Bus -> Car
+        4: 5, # Motorbike
+        5: 6, # Airplane
+        9: 7, # Ship (Boat)
+        16: 8, # Bird
+        17: 9, # Cat
+        18: 10, # Dog
+        19: 11, # Horse
+        21: 12  # Cow
+    }
 
     xmin = []
     xmax = []
@@ -381,6 +404,7 @@ def create_tf_example(image,
     encoded_mask_png = []
     num_annotations_skipped = 0
     dp_triggered = True  # DensePose preprocessing just one time
+    binary_masks = []
 
     for object_annotations in annotations_list:
         category_id = int(object_annotations['category_id'])
@@ -433,6 +457,8 @@ def create_tf_example(image,
                             is_crowd.append(ann['iscrowd'])
                             area.append(prop.area)
 
+                            binary_mask[binary_mask > 0] = 2
+                            binary_masks.append(binary_mask)
                             pil_image = PIL.Image.fromarray(binary_mask)
                             output_io = io.BytesIO()
                             pil_image.save(output_io, format='PNG')
@@ -449,7 +475,7 @@ def create_tf_example(image,
                             binary_mask = np.zeros((img_face.shape[0], img_face.shape[1]))
                             binary_mask[y1:y2, x1:x2][mask_body] = 1
                             binary_mask = np.uint8(binary_mask)
-
+                            
                             props = regionprops(binary_mask)
                             prop = props[0]
 
@@ -460,6 +486,8 @@ def create_tf_example(image,
                             is_crowd.append(ann['iscrowd'])
                             area.append(prop.area)
 
+                            binary_mask[binary_mask > 0] = 1
+                            binary_masks.append(binary_mask)
                             pil_image = PIL.Image.fromarray(binary_mask)
                             output_io = io.BytesIO()
                             pil_image.save(output_io, format='PNG')
@@ -489,32 +517,30 @@ def create_tf_example(image,
             if not object_annotations['iscrowd']:
                 binary_mask = np.amax(binary_mask, axis=2)  # (H, W, 1) --> (H, W)
 
-            
+            binary_mask[binary_mask > 0] = remapping[category_id]
+            binary_masks.append(binary_mask)
             pil_image = PIL.Image.fromarray(binary_mask)
             output_io = io.BytesIO()
             pil_image.save(output_io, format='PNG')
             encoded_mask_png.append(output_io.getvalue())
 
-    # Label Remapping
-    # Background --> 0
-    remapping = {
-        # Person --> Person Face & Person Body
-        -1: 1,  # Person Face
-        -2: 2,  # Person Body
-        2: 3, # Bicycle
-        3: 4, # Car -> Car
-        6: 4, # Bus -> Car
-        4: 5, # Motorbike
-        5: 6, # Airplane
-        9: 7, # Ship (Boat)
-        16: 8, # Bird
-        17: 9, # Cat
-        18: 10, # Dog
-        19: 11, # Horse
-        21: 12  # Cow
-    }
-
     category_ids = list(map(lambda x: remapping[x], category_ids))
+
+    if len(category_ids) != 0:
+        if image_dir == FLAGS.train_image_dir:
+            origin_image.save(f'ground_truth/train/{filename}')
+        elif image_dir == FLAGS.val_image_dir:
+            origin_image.save(f'ground_truth/test/{filename}')
+
+        binary_masks = np.stack(binary_masks, axis=-1)
+        binary_masks = np.amax(binary_masks, axis=-1)
+        binary_masks = binary_masks.astype(np.uint8)
+        mask_PIL = PIL.Image.fromarray(binary_masks)
+
+        if image_dir == FLAGS.train_image_dir:
+            mask_PIL.save(f'ground_truth/train/{filename.split(".")[0]}_mask.png')
+        elif image_dir == FLAGS.val_image_dir:
+            mask_PIL.save(f'ground_truth/test/{filename.split(".")[0]}_mask.png')
 
     feature_dict = {
         'image/height':
