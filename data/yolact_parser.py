@@ -63,16 +63,16 @@ class Parser(object):
 
         # Skips annotations with `is_crowd` = True.
         # Todo: Need to understand control_dependeicies and tf.gather
-        if self._skip_crowd_during_training and self._is_training:
-            num_groundtrtuhs = tf.shape(input=classes)[0]
-            with tf.control_dependencies([num_groundtrtuhs, is_crowds]):
-                indices = tf.cond(
-                    pred=tf.greater(tf.size(input=is_crowds), 0),
-                    true_fn=lambda: tf.where(tf.logical_not(is_crowds))[:, 0],
-                    false_fn=lambda: tf.cast(tf.range(num_groundtrtuhs), tf.int64))
-            classes = tf.gather(classes, indices)
-            boxes = tf.gather(boxes, indices)
-            masks = tf.gather(masks, indices)
+        # if self._skip_crowd_during_training and self._is_training:
+        #     num_groundtrtuhs = tf.shape(input=classes)[0]
+        #     with tf.control_dependencies([num_groundtrtuhs, is_crowds]):
+        #         indices = tf.cond(
+        #             pred=tf.greater(tf.size(input=is_crowds), 0),
+        #             true_fn=lambda: tf.where(tf.logical_not(is_crowds))[:, 0],
+        #             false_fn=lambda: tf.cast(tf.range(num_groundtrtuhs), tf.int64))
+        #     classes = tf.gather(classes, indices)
+        #     boxes = tf.gather(boxes, indices)
+        #     masks = tf.gather(masks, indices)
 
         # read and normalize the image
         image = data['image']
