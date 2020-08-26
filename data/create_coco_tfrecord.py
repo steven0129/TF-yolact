@@ -590,10 +590,10 @@ def create_tf_example_imgaug(image,
         ymax = []
 
         for x1, x2, y1, y2 in bbs:
-            xmin.append(x1)
-            xmax.append(x2)
-            ymin.append(y1)
-            ymax.append(y2)
+            xmin.append(float(x1) / image_aug.shape[1])
+            xmax.append(float(x2) / image_aug.shape[1])
+            ymin.append(float(y1) / image_aug.shape[0])
+            ymax.append(float(y2) / image_aug.shape[0])
 
         # Process augmented masks
         encoded_mask_png = []
