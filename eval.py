@@ -4,6 +4,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import lite
 import numpy as np
+import csv
 
 from data import dataset_coco, anchor
 from utils import learning_rate_schedule, label_map
@@ -150,7 +151,7 @@ YOLACT = lite.MyYolact(input_size=320,
 
 model = YOLACT.gen()
 
-ckpt_dir = "checkpoints-SGD"
+ckpt_dir = "checkpoints-SGD-20200828"
 latest = tf.train.latest_checkpoint(ckpt_dir)
 
 checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
@@ -184,50 +185,70 @@ remapping = [
     'Cow'
 ]
 
-TT = 0  # 應被detect但被detect
-TF = 0  # 應被detect但沒被detect
-FT = 0  # 應沒被detect但被detect
-total = 0
+confusion_matrix = [[0 for _ in range(13)] for j in range(13)]
 
 for image, labels in tqdm(valid_dataset.take(3000)):
     # only try on 1 image
     output = model(image, training=False)
     detection = detect_layer(output)
 
+    gt_bbox = labels['bbox'].numpy()
     gt_cls = labels['classes'].numpy()
     num_obj = labels['num_obj'].numpy()
 
     if detection[0]['detection'] != None:
         my_cls, scores, bbox, masks = postprocess(detection, 320, 320, 0, 'bilinear')
         my_cls, scores, bbox, masks = my_cls.numpy(), scores.numpy(), bbox.numpy(), masks.numpy()
+        
         ground_truth = []
         prediction = []
 
         for idx in range(num_obj[0]):
-            ground_truth.append(gt_cls[0][idx])
+            ground_truth.append({
+                'class': gt_cls[0][idx],
+                'bbox': gt_bbox[0][idx]
+            })
 
         for idx in range(bbox.shape[0]):
-            prediction.append(my_cls[idx]+1)
+            prediction.append({
+                'class': my_cls[idx] + 1,
+                'bbox': bbox[idx]
+            })
 
         # TT
         gt_for_tt = ground_truth.copy()
         pred_for_tt = prediction.copy()
-        for pred in prediction:
-            if pred in gt_for_tt:
-                TT += 1
-                gt_for_tt.remove(pred)
-                pred_for_tt.remove(pred)
 
-        TF += len(gt_for_tt)
-        FT += len(pred_for_tt)
+        for i, pred in enumerate(prediction):
+            max_id = -1
+            iou_max = 0
+            
+            for j, gt in enumerate(gt_for_tt):
+                iou_curr = utils.jaccard_numpy(pred['bbox'], gt['bbox'])
+                if iou_curr > iou_max:
+                    iou_max = iou_curr
+                    max_id = j
+            
+            if max_id != -1:
+                if iou_max > 0.5:
+                    confusion_matrix[gt_for_tt[max_id]['class']][pred['class']] += 1
+                else:
+                    confusion_matrix[0][pred['class']] += 1
+                
+                del gt_for_tt[max_id]
+            else:
+                confusion_matrix[0][pred['class']] += 1
 
+        for gt in gt_for_tt:
+            confusion_matrix[gt['class']][0] += 1
     else:
-        TF += num_obj[0]
+        for idx in range(num_obj[0]):
+            confusion_matrix[gt_cls[0][idx]][0] += 1
 
-    tqdm.write(f'TT: {TT}')
-    tqdm.write(f'TF: {TF}')
-    tqdm.write(f'FT: {FT}')
+if os.path.exists('confusion_matrix.csv'):
+    os.remove('confusion_matrix.csv')
 
-print('TT:', TT)
-print('TF:', TF)
-print('FT:', FT)
+with open('confusion_matrix.csv', 'w', newline='') as FILE:
+    writer = csv.writer(FILE)
+    for row in confusion_matrix:
+        writer.writerow(row)
