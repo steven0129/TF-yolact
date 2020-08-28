@@ -600,6 +600,7 @@ def create_tf_example_imgaug(image,
         # Process augmented masks
         encoded_mask_png = []
         for mask_curr in binary_masks:
+            mask_curr = np.uint8(mask_curr)
             pil_image = PIL.Image.fromarray(mask_curr)
             output_io = io.BytesIO()
             pil_image.save(output_io, format='PNG')
