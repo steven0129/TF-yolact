@@ -176,6 +176,7 @@ def create_tf_horizontal_flip_example(image,
         encoded_jpg = fid.read()
     encoded_jpg_io = io.BytesIO(encoded_jpg)
     image = PIL.Image.open(encoded_jpg_io)
+    image = image.convert('RGB')
     r = 320
     image = image.resize((r, r), PIL.Image.ANTIALIAS)
     image = image.transpose(PIL.Image.FLIP_LEFT_RIGHT)   # Image Horizontal Flip
@@ -412,6 +413,7 @@ def create_tf_example_imgaug(image,
         encoded_jpg = fid.read()
     encoded_jpg_io = io.BytesIO(encoded_jpg)
     image = PIL.Image.open(encoded_jpg_io)
+    image = image.convert('RGB')
     origin_image = image
     r = 320
     image = image.resize((r, r), PIL.Image.ANTIALIAS)
@@ -691,6 +693,7 @@ def create_tf_example(image,
         encoded_jpg = fid.read()
     encoded_jpg_io = io.BytesIO(encoded_jpg)
     image = PIL.Image.open(encoded_jpg_io)
+    image = image.convert('RGB')
     r = 320
     image = image.resize((r, r), PIL.Image.ANTIALIAS)
     bytes_io = io.BytesIO()
