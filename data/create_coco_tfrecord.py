@@ -97,11 +97,20 @@ def data_aug(image, bounding_boxes, binary_masks, category_ids, category_names, 
     bbs = ia.BoundingBoxesOnImage(bbs, shape=image.shape)
 
     aug = [
-        iaa.Sequential([iaa.CropToFixedSize(width=320, height=320)]),
-        iaa.Sequential([iaa.MotionBlur(k=5)])
+        iaa.Sequential([iaa.CropToFixedSize(width=320, height=320, position='uniform')]),
+        iaa.Sequential([iaa.Affine(scale={"x": (0.5, 1.2), "y": (0.5, 1.2)})]),
+        iaa.Sequential([iaa.MotionBlur(k=5)]),
+        iaa.Sequential([iaa.GammaContrast((0.5, 2.0))]),
+        iaa.Sequential([iaa.GammaContrast((0.5, 2.0), per_channel=True)]),
+        iaa.Sequential([iaa.AddToHue((-50, 50)), iaa.MultiplySaturation((0.5, 1.5))]),
+        iaa.Sequential([iaa.MultiplyBrightness((0.5, 1.5))])
     ]
 
-    image_aug, binary_mask_aug, bbs_aug = aug[random.randint(0, 1)](image=image, segmentation_maps=binary_masks, bounding_boxes=bbs)
+    image_aug, binary_mask_aug, bbs_aug = aug[random.randint(0, 6)](image=image, segmentation_maps=binary_masks, bounding_boxes=bbs)
+    # demo_image = binary_mask_aug.draw_on_image(image_aug)[0]
+    # cv2.imwrite('demo_image.png', cv2.cvtColor(demo_image, cv2.COLOR_BGR2RGB))
+    # exit()
+
     binary_mask_aug = binary_mask_aug.get_arr()
     binary_mask_aug[binary_mask_aug > 0] = 1
     
