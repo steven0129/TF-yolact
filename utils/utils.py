@@ -112,7 +112,6 @@ def map_to_bbox(anchors, loc_pred):
     anchor_w = anchors[:, 3] - anchors[:, 1]
     anchor_cx = anchors[:, 1] + (anchor_w / 2)
     anchor_cy = anchors[:, 0] + (anchor_h / 2)
-    tf.print("cx", tf.shape(anchor_cx))
 
     pred_cx, pred_cy, pred_w, pred_h = tf.unstack(loc_pred, axis=-1)
 
@@ -127,10 +126,7 @@ def map_to_bbox(anchors, loc_pred):
     xmax = new_cx + (new_w / 2)
 
     decoded_boxes = tf.stack([ymin, xmin, ymax, xmax], axis=-1)
-    tf.print(tf.shape(decoded_boxes))
 
-    tf.print("anchor", tf.shape(anchors))
-    tf.print("pred", tf.shape(loc_pred))
     return decoded_boxes
 
 
@@ -208,7 +204,6 @@ def postprocess(detection, w, h, batch_idx, intepolation_mode="bilinear", crop_m
     scores = dets['score']
     masks = dets['mask']
     proto_pred = dets['proto']
-    tf.print(tf.shape(masks))
     pred_mask = tf.linalg.matmul(proto_pred, masks, transpose_a=False, transpose_b=True)
     pred_mask = tf.nn.sigmoid(pred_mask)
     pred_mask = tf.transpose(pred_mask, perm=(2, 0, 1))
