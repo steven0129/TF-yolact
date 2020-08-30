@@ -298,7 +298,6 @@ def main(argv):
                                             trainer.v_seg.result()))
                 
                 best_val = trainer.valid_loss.result()
-                model.save_weights('./weights/weights_' + str(iterations) + '.h5')
                 converter = tf.lite.TFLiteConverter.from_keras_model(model)
                 tflite_model = converter.convert()
                 with tf.io.gfile.GFile('./weights/yolact_' + str(iterations) + '.tflite', 'wb') as F:
