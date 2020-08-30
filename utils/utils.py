@@ -177,6 +177,26 @@ def jaccard(box_a, box_b):
     # IOU(Jaccard overlap) = intersection / union, there might be possible to have division by 0
     return pairwise_inter / pairwise_union
 
+def jaccard_numpy(box_a, box_b):
+    ymin_a, xmin_a, ymax_a, xmax_a = box_a
+    ymin_b, xmin_b, ymax_b, xmax_b = box_b
+
+    xleft = max(xmin_a, xmin_b)
+    ytop = max(ymin_a, ymin_b)
+    xright = min(xmax_a, xmax_b)
+    ybottom = min(ymax_a, ymax_b)
+
+    if xright < xleft or ybottom < ytop:
+        return 0.0
+
+    intersection_area = (xright - xleft) * (ybottom - ytop)
+    box_a_area = (xmax_a - xmin_a) * (ymax_a - ymin_a)
+    box_b_area = (xmax_b - xmin_b) * (ymax_b - ymin_b)
+
+    iou = intersection_area / float(box_a_area + box_b_area - intersection_area)
+
+    return iou
+
 
 # post process after detection layer
 # Todo: Use tensorflows intepolation mode option
