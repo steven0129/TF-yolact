@@ -212,14 +212,15 @@ print("Restore Ckpt Sucessfully!!")
 # Need default anchor
 anchorobj = anchor.Anchor(img_size=320, feature_map_size=[40, 20, 10, 5, 3], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
 valid_dataset = dataset_coco.prepare_dataloader(img_size=320,
-                                                tfrecord_dir='data/coco_tfrecord_320x320_hflip',
+                                                tfrecord_dir='data/coco_tfrecord_320x320_20200828',
                                                 batch_size=1,
-                                                subset='val')
+                                                subset='train')
 anchors = anchorobj.get_anchors()
 tf.print(tf.shape(anchors))
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.8, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.2, nms_threshold=0.5, anchors=anchors)
 
 for image, labels in valid_dataset.take(1):
+    print('mask_target', np.count_nonzero(labels['mask_target']))
     # only try on 1 image
     output = model(image, training=False)
     detection = detect_layer(output)
@@ -297,11 +298,15 @@ for image, labels in valid_dataset.take(1):
     cv2.imwrite('result.png', image)
 
     # show the mask
-    seg = np.zeros([320, 320])
+    seg = np.zeros([320, 320, masks.shape[0]])
 
     for idx in range(masks.shape[0]):
         mask = masks[idx].astype(np.uint8)
-        seg = seg + mask
+        mask[mask > 0] = my_cls[idx]+1
+        seg[:, :, idx] = mask
 
-    seg[seg >= 1] = 255
+    seg = seg / 13 * 255
+    seg = np.amax(seg, axis=-1)
+    seg = seg.astype(np.uint8)
+    seg = 255 - seg
     cv2.imwrite('seg.png', seg)
