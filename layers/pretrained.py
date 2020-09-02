@@ -5,6 +5,7 @@ class MobileNetV2():
         self.base_model = tf.keras.applications.MobileNetV2(
             input_shape=input_shape, 
             include_top=False, 
+            alpha=0.75,
             layers=tf.keras.layers, 
             weights='imagenet'
         )
@@ -214,8 +215,5 @@ if __name__ == '__main__':
     dummy_input = tf.zeros((8, 320, 320, 3))
     model = MobileNetV2(input_shape=(320, 320, 3)).gen()
     model.summary()
-
-    y = model(dummy_input, training=False)
-    tf.print(tf.shape(y[0]))
-    tf.print(tf.shape(y[1]))
-    tf.print(tf.shape(y[2]))
+    with open('mobilenetv2.txt', 'w') as FILE:
+        model.summary(print_fn=lambda x: FILE.write(x + '\n'))
