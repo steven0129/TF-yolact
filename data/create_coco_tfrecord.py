@@ -97,7 +97,7 @@ def data_aug(image, bounding_boxes, binary_masks, category_ids, category_names, 
     bbs = ia.BoundingBoxesOnImage(bbs, shape=image.shape)
 
     aug = [
-        iaa.Sequential([iaa.CropToFixedSize(width=320, height=320, position='uniform')]),
+        iaa.Sequential([iaa.CropToFixedSize(width=256, height=256, position='uniform')]),
         iaa.Sequential([iaa.Affine(scale={"x": (0.5, 1.2), "y": (0.5, 1.2)})]),
         iaa.Sequential([iaa.MotionBlur(k=5)]),
         iaa.Sequential([iaa.GammaContrast((0.5, 2.0))]),
@@ -186,7 +186,7 @@ def create_tf_horizontal_flip_example(image,
     encoded_jpg_io = io.BytesIO(encoded_jpg)
     image = PIL.Image.open(encoded_jpg_io)
     image = image.convert('RGB')
-    r = 320
+    r = 256
     image = image.resize((r, r), PIL.Image.ANTIALIAS)
     image = image.transpose(PIL.Image.FLIP_LEFT_RIGHT)   # Image Horizontal Flip
     bytes_io = io.BytesIO()
@@ -424,7 +424,7 @@ def create_tf_example_imgaug(image,
     image = PIL.Image.open(encoded_jpg_io)
     image = image.convert('RGB')
     origin_image = image
-    r = 320
+    r = 256
     image = image.resize((r, r), PIL.Image.ANTIALIAS)
     bytes_io = io.BytesIO()
     image.save(bytes_io, format='JPEG')
@@ -616,7 +616,7 @@ def create_tf_example_imgaug(image,
             encoded_mask_png.append(output_io.getvalue())
 
         # Process augmented images
-        r = 320
+        r = 256
         image = PIL.Image.fromarray(image_aug)
         image = image.resize((r, r), PIL.Image.ANTIALIAS)
         bytes_io = io.BytesIO()
@@ -704,7 +704,7 @@ def create_tf_example(image,
     encoded_jpg_io = io.BytesIO(encoded_jpg)
     image = PIL.Image.open(encoded_jpg_io)
     image = image.convert('RGB')
-    r = 320
+    r = 256
     image = image.resize((r, r), PIL.Image.ANTIALIAS)
     bytes_io = io.BytesIO()
     image.save(bytes_io, format='JPEG')
