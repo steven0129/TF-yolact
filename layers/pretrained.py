@@ -212,8 +212,8 @@ class MobileNetV2():
 
 
 if __name__ == '__main__':
-    dummy_input = tf.zeros((8, 320, 320, 3))
-    model = MobileNetV2(input_shape=(320, 320, 3)).gen()
+    dummy_input = tf.zeros((8, 256, 256, 3))
+    model = MobileNetV2(input_shape=(256, 256, 3)).gen()
     model.summary()
     with open('mobilenetv2.txt', 'w') as FILE:
         model.summary(print_fn=lambda x: FILE.write(x + '\n'))
