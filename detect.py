@@ -214,7 +214,7 @@ anchorobj = anchor.Anchor(img_size=320, feature_map_size=[40, 20, 10, 5, 3], asp
 valid_dataset = dataset_coco.prepare_dataloader(img_size=320,
                                                 tfrecord_dir='data/coco_tfrecord_320x320_20200828',
                                                 batch_size=1,
-                                                subset='train')
+                                                subset='val')
 anchors = anchorobj.get_anchors()
 tf.print(tf.shape(anchors))
 detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.2, nms_threshold=0.5, anchors=anchors)
