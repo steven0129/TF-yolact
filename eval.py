@@ -151,7 +151,7 @@ YOLACT = lite.MyYolact(input_size=320,
 
 model = YOLACT.gen()
 
-ckpt_dir = "checkpoints-SGD-20200828"
+ckpt_dir = "checkpoints-SGD"
 latest = tf.train.latest_checkpoint(ckpt_dir)
 
 checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
@@ -163,11 +163,11 @@ print("Restore Ckpt Sucessfully!!")
 # Need default anchor
 anchorobj = anchor.Anchor(img_size=320, feature_map_size=[40, 20, 10, 5, 3], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
 valid_dataset = dataset_coco.prepare_dataloader(img_size=320,
-                                                tfrecord_dir='data/coco_tfrecord_320x320_20200826',
+                                                tfrecord_dir='data/coco_tfrecord_320x320_20200828',
                                                 batch_size=1,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.5, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.2, nms_threshold=0.5, anchors=anchors)
 
 remapping = [
     'Background',
