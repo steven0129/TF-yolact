@@ -190,9 +190,9 @@ class Detect(object):
 lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=1e-3)
 optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=0.9)
 
-YOLACT = lite.MyYolact(input_size=320,
+YOLACT = lite.MyYolact(input_size=256,
                fpn_channels=256,
-               feature_map_size=[40, 20, 10, 5, 3],
+               feature_map_size=[32, 16, 8, 4, 2],
                num_class=13,
                num_mask=32,
                aspect_ratio=[1, 0.5, 2],
@@ -210,9 +210,9 @@ print("Restore Ckpt Sucessfully!!")
 # Load Validation Images and do Detection
 # -----------------------------------------------------------------------------------------------
 # Need default anchor
-anchorobj = anchor.Anchor(img_size=320, feature_map_size=[40, 20, 10, 5, 3], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
-valid_dataset = dataset_coco.prepare_dataloader(img_size=320,
-                                                tfrecord_dir='data/coco_tfrecord_320x320_20200828',
+anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
+valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
+                                                tfrecord_dir='data/coco_tfrecord_256x256_20200902',
                                                 batch_size=1,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
@@ -226,7 +226,7 @@ for image, labels in valid_dataset.take(1):
     detection = detect_layer(output)
     print(len(detection))
 
-    my_cls, scores, bbox, masks = postprocess(detection, 320, 320, 0, 'bilinear')
+    my_cls, scores, bbox, masks = postprocess(detection, 256, 256, 0, 'bilinear')
 
     tf.print(f'cls: {tf.shape(my_cls)}')
     tf.print(f'scores: {tf.shape(scores)}')
@@ -298,7 +298,7 @@ for image, labels in valid_dataset.take(1):
     cv2.imwrite('result.png', image)
 
     # show the mask
-    seg = np.zeros([320, 320, masks.shape[0]])
+    seg = np.zeros([256, 256, masks.shape[0]])
 
     for idx in range(masks.shape[0]):
         mask = masks[idx].astype(np.uint8)
