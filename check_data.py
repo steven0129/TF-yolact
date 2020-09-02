@@ -135,21 +135,21 @@ def main(argv):
     # Creating dataloaders for training and validation
     logging.info("Creating the dataloader from: %s..." % FLAGS.tfrecord_dir)
     train_dataset = dataset_coco.prepare_dataloader(tfrecord_dir=FLAGS.tfrecord_dir,
-                                                    img_size=320,
+                                                    img_size=256,
                                                     batch_size=FLAGS.batch_size,
                                                     subset='train')
 
     valid_dataset = dataset_coco.prepare_dataloader(tfrecord_dir=FLAGS.tfrecord_dir,
-                                                    img_size=320,
+                                                    img_size=256,
                                                     batch_size=1,
                                                     subset='val')
     
     # -----------------------------------------------------------------
     # Creating the instance of the model specified.
     logging.info("Creating the model instance of YOLACT")
-    YOLACT = lite.MyYolact(input_size=320,
+    YOLACT = lite.MyYolact(input_size=256,
                           fpn_channels=256,
-                          feature_map_size=[40, 20, 10, 5, 3],
+                          feature_map_size=[32, 16, 8, 4, 2],
                           num_class=13, # 12 classes + 1 background
                           num_mask=32,
                           aspect_ratio=[1, 0.5, 2],

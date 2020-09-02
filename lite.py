@@ -71,13 +71,13 @@ class MyYolact():
 
 if __name__ == '__main__':
     YOLACT = MyYolact(
-        input_size=320,
+        input_size=256,
         fpn_channels=256, 
-        feature_map_size=[40, 20, 10, 5, 3],
+        feature_map_size=[32, 16, 8, 4, 2],
         num_class=13, # 12 classes + 1 background
-        num_mask=64,
+        num_mask=32,
         aspect_ratio=[1, 0.5, 2],
-        scales=[24 * 2, 48 * 2, 96 * 2, 192 * 2, 384 * 2]
+        scales=[24, 48, 96, 192, 384]
     )
 
     model = YOLACT.gen()
