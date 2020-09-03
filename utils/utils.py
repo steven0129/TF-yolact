@@ -227,7 +227,7 @@ def postprocess(detection, w, h, batch_idx, intepolation_mode="bilinear", crop_m
     pred_mask = tf.linalg.matmul(proto_pred, masks, transpose_a=False, transpose_b=True)
     pred_mask = tf.nn.sigmoid(pred_mask)
     pred_mask = tf.transpose(pred_mask, perm=(2, 0, 1))
-    masks = crop(pred_mask, boxes, origin_w=320, origin_h=320)
+    masks = crop(pred_mask, boxes, origin_w=256, origin_h=256)
 
     # intepolate to original size (test 550*550 here)
     masks = tf.image.resize(tf.expand_dims(masks, axis=-1), [w, h], method=intepolation_mode)
