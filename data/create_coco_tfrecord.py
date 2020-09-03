@@ -50,6 +50,7 @@ from pycocotools import mask
 from pycocotools.coco import COCO
 import pycocotools.mask as mask_util
 from skimage.measure import regionprops
+from PIL import Image
 
 from data import dataset_util
 
@@ -894,6 +895,79 @@ def create_tf_example(image,
     example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
     return key, example, num_annotations_skipped, len(category_ids)
 
+def create_scene_parse_tf_example(filename, image, masks, category_ids):
+    image_id = filename.split('.')[0].split('_')[2]
+    w, h = image.size
+    print(category_ids)
+
+    image = image.convert('RGB')
+    r = 256
+    image = image.resize((r, r), PIL.Image.ANTIALIAS)
+    bytes_io = io.BytesIO()
+    image.save(bytes_io, format='JPEG')
+    encoded_jpg = bytes_io.getvalue()
+    key = hashlib.sha256(encoded_jpg).hexdigest()
+    
+    xmin = []
+    xmax = []
+    ymin = []
+    ymax = []
+    areas = []
+    encoded_mask_pngs = []
+    is_crowd = []
+
+    for mask in masks:
+        prop = regionprops(mask)[0]
+
+        xmin.append(float(prop.bbox[1]) / w)
+        xmax.append(float(prop.bbox[3]) / w)
+        ymin.append(float(prop.bbox[0]) / h)
+        ymax.append(float(prop.bbox[2]) / h)
+        areas.append(prop.area)
+
+        pil_image = PIL.Image.fromarray(mask)
+        output_io = io.BytesIO()
+        pil_image.save(output_io, format='PNG')
+        encoded_mask_pngs.append(output_io.getvalue())
+        is_crowd.append(0)
+
+    feature_dict = {
+        'image/height':
+            dataset_util.int64_feature(r),
+        'image/width':
+            dataset_util.int64_feature(r),
+        'image/filename':
+            dataset_util.bytes_feature(filename.encode('utf-8')),
+        'image/source_id':
+            dataset_util.bytes_feature(image_id.encode('utf-8')),
+        'image/key/sha256':
+            dataset_util.bytes_feature(key.encode('utf-8')),
+        'image/encoded':
+            dataset_util.bytes_feature(encoded_jpg),
+        'image/format':
+            dataset_util.bytes_feature('jpeg'.encode('utf8')),
+        'image/object/bbox/xmin':
+            dataset_util.float_list_feature(xmin),
+        'image/object/bbox/xmax':
+            dataset_util.float_list_feature(xmax),
+        'image/object/bbox/ymin':
+            dataset_util.float_list_feature(ymin),
+        'image/object/bbox/ymax':
+            dataset_util.float_list_feature(ymax),
+        'image/object/class/label_text':
+            dataset_util.bytes_list_feature(['dummy'.encode('utf-8')]),
+        'image/object/class/label_id':
+            dataset_util.int64_list_feature(category_ids),
+        'image/object/is_crowd':
+            dataset_util.int64_list_feature(is_crowd),
+        'image/object/area':
+            dataset_util.float_list_feature(areas),
+        'image/object/mask':
+            dataset_util.bytes_list_feature(encoded_mask_pngs)
+    }
+
+    example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
+    return example
 
 def _create_tf_record_from_coco_annotations(
         annotations_file, image_dir, output_path, num_shards):
@@ -937,7 +1011,9 @@ def _create_tf_record_from_coco_annotations(
 
         total_num_annotations_skipped = 0
         total_num_instances = 0
+        num_images = 0
 
+        # COCO dataset
         for idx, image in enumerate(images):
             if idx % 100 == 0:
                 logging.info(f'On image {idx} of {len(images)}. Process {total_num_instances} instances.')
@@ -953,6 +1029,7 @@ def _create_tf_record_from_coco_annotations(
             if num_crowd != len(annotations_list):
                 _, tf_example, num_annotations_skipped, num_instances = create_tf_example(image, annotations_list, image_dir, category_index)
                 if num_instances != 0:
+                    num_images += 1
                     total_num_annotations_skipped += num_annotations_skipped
                     total_num_instances += num_instances
                     shard_idx = idx % num_shards
@@ -976,10 +1053,111 @@ def _create_tf_record_from_coco_annotations(
                         output_tfrecords[shard_idx].write(tf_example.SerializeToString())
             else:
                 total_num_annotations_skipped += len(annotations_list)
-
         logging.info('Finished writing, skipped %d annotations.',
                      total_num_annotations_skipped)
 
+        if image_dir == FLAGS.train_image_dir:
+            open('coco-info-train.txt', 'w').write(f'images: {num_images}, instances: {total_num_instances}')
+        elif image_dir == FLAGS.val_image_dir:
+            open('coco-info-val.txt', 'w').write(f'images: {num_images}, instances: {total_num_instances}')
+
+        # Scene Parsing Dataset
+        remapping = {
+            8: 4,  # Car -> Car
+            47: 7,  # Boat -> Ship
+            49: 4,  # Bus -> Car
+            52: 4,  # Truck -> Car
+            58: 6,  # Airplane -> Airplane
+            64: 4,  # Van -> Car
+            65: 7,  # Ship -> Ship
+            73: 5,  # Minibike -> Motorbike
+            82: 3,  # Bicycle -> Bicycle
+        }
+
+        if image_dir == FLAGS.val_image_dir:
+            num_image = 0
+            num_instances = 0
+            with open('data/scene-parse-ins/images/validation.txt') as FILE:
+                for image_idx, line in enumerate(FILE):
+                    shard_idx = image_idx % num_shards
+                    filepath = line.rstrip()
+                    annpath = filepath.split('.')[0] + '.png'
+
+                    img = Image.open(f'data/scene-parse-ins/images/{filepath}')
+                    ann = np.array(Image.open(f'data/scene-parse-ins/annotations_instance/{annpath}'))
+
+                    cls_label = ann[:, :, 0]
+                    mask = ann[:, :, 1]
+                    num_obj = np.bincount(mask.flatten()).shape[0]
+                    
+                    category_ids = []
+                    masks = []
+
+                    if num_obj > 1:
+                        for idx in range(1, num_obj):
+                            curr_mask = np.copy(mask)
+                            curr_label = np.copy(cls_label)
+
+                            curr_mask[curr_mask != idx] = 0
+                            curr_label[curr_mask != idx] = 0
+                            
+                            curr_cls = np.argmax(np.bincount(curr_label.flatten())[1:])
+                            if curr_cls in list(remapping.keys()):
+                                curr_mask[curr_mask > 0] = 1
+                                curr_mask = np.uint8(curr_mask)
+                                masks.append(curr_mask)
+                                category_ids.append(remapping[curr_cls])
+
+                        if len(masks) != 0:
+                            num_image += 1
+                            num_instances += len(category_ids)
+                            tf_example = create_scene_parse_tf_example(filepath.split('/')[1], img, masks, category_ids)
+                            output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+
+                open('scene-parse-info-val.txt', 'w').write(f'images: {num_image}, instances: {num_instances}')
+
+        
+        if image_dir == FLAGS.train_image_dir:
+            num_image = 0
+            num_instances = 0
+            with open('data/scene-parse-ins/images/training.txt') as FILE:
+                for image_idx, line in enumerate(FILE):
+                    shard_idx = image_idx % num_shards
+                    filepath = line.rstrip()
+                    annpath = filepath.split('.')[0] + '.png'
+
+                    img = Image.open(f'data/scene-parse-ins/images/{filepath}')
+                    ann = np.array(Image.open(f'data/scene-parse-ins/annotations_instance/{annpath}'))
+
+                    cls_label = ann[:, :, 0]
+                    mask = ann[:, :, 1]
+                    num_obj = np.bincount(mask.flatten()).shape[0]
+                    
+                    category_ids = []
+                    masks = []
+
+                    if num_obj > 1:
+                        for idx in range(1, num_obj):
+                            curr_mask = np.copy(mask)
+                            curr_label = np.copy(cls_label)
+
+                            curr_mask[curr_mask != idx] = 0
+                            curr_label[curr_mask != idx] = 0
+                            
+                            curr_cls = np.argmax(np.bincount(curr_label.flatten())[1:])
+                            if curr_cls in list(remapping.keys()):
+                                curr_mask[curr_mask > 0] = 1
+                                curr_mask = np.uint8(curr_mask)
+                                masks.append(curr_mask)
+                                category_ids.append(remapping[curr_cls])
+
+                        if len(masks) != 0:
+                            num_image += 1
+                            num_instances += len(category_ids)
+                            tf_example = create_scene_parse_tf_example(filepath.split('/')[1], img, masks, category_ids)
+                            output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+
+                open('scene-parse-info-train.txt', 'w').write(f'images: {num_image}, instances: {num_instances}')
 
 def main(_):
     assert FLAGS.train_image_dir, '`train_image_dir` missing.'
