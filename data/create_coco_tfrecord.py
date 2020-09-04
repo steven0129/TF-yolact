@@ -379,7 +379,7 @@ def create_tf_horizontal_flip_example(image,
     }
     
     example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
-    return key, example, num_annotations_skipped, len(category_ids)
+    return key, example, num_annotations_skipped, category_ids
 
 
 def create_tf_example_imgaug(image,
@@ -661,7 +661,7 @@ def create_tf_example_imgaug(image,
     }
     
     example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
-    return key, example, num_annotations_skipped, len(category_ids)
+    return key, example, num_annotations_skipped, category_ids
 
 def create_tf_example(image,
                       annotations_list,
@@ -893,7 +893,7 @@ def create_tf_example(image,
     }
     
     example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
-    return key, example, num_annotations_skipped, len(category_ids)
+    return key, example, num_annotations_skipped, category_ids
 
 def create_scene_parse_tf_example(filename, image, masks, category_ids):
     image_id = filename.split('.')[0].split('_')[2]
@@ -1011,6 +1011,7 @@ def _create_tf_record_from_coco_annotations(
         total_num_annotations_skipped = 0
         total_num_instances = 0
         num_images = 0
+        category_counts = [0] * 13
 
         # COCO dataset
         for idx, image in enumerate(images):
@@ -1026,16 +1027,22 @@ def _create_tf_record_from_coco_annotations(
                     num_crowd += 1
             
             if num_crowd != len(annotations_list):
-                _, tf_example, num_annotations_skipped, num_instances = create_tf_example(image, annotations_list, image_dir, category_index)
+                _, tf_example, num_annotations_skipped, category_ids = create_tf_example(image, annotations_list, image_dir, category_index)
+                num_instances = len(category_ids)
                 if num_instances != 0:
                     num_images += 1
+
+                    for cat_id in category_ids:
+                        category_counts[cat_id] += 1
+
                     total_num_annotations_skipped += num_annotations_skipped
                     total_num_instances += num_instances
                     shard_idx = idx % num_shards
                     output_tfrecords[shard_idx].write(tf_example.SerializeToString())
 
                 # Horizontal Flip Augmentation
-                _, tf_example, num_annotations_skipped, num_instances = create_tf_horizontal_flip_example(image, annotations_list, image_dir, category_index)
+                _, tf_example, num_annotations_skipped, category_ids = create_tf_horizontal_flip_example(image, annotations_list, image_dir, category_index)
+                num_instances = len(category_ids)
                 if num_instances != 0:
                     total_num_annotations_skipped += num_annotations_skipped
                     total_num_instances += num_instances
@@ -1044,7 +1051,8 @@ def _create_tf_record_from_coco_annotations(
 
                 # Other Data Augmentation
                 if image_dir == FLAGS.train_image_dir:
-                    _, tf_example, num_annotations_skipped, num_instances = create_tf_example_imgaug(image, annotations_list, image_dir, category_index)
+                    _, tf_example, num_annotations_skipped, category_ids = create_tf_example_imgaug(image, annotations_list, image_dir, category_index)
+                    num_instances = len(category_ids)
                     if num_instances != 0:
                         total_num_annotations_skipped += num_annotations_skipped
                         total_num_instances += num_instances
@@ -1052,13 +1060,16 @@ def _create_tf_record_from_coco_annotations(
                         output_tfrecords[shard_idx].write(tf_example.SerializeToString())
             else:
                 total_num_annotations_skipped += len(annotations_list)
+
         logging.info('Finished writing, skipped %d annotations.',
                      total_num_annotations_skipped)
 
+            
+
         if image_dir == FLAGS.train_image_dir:
-            open('coco-info-train.txt', 'w').write(f'images: {num_images}, instances: {total_num_instances}')
+            open('coco-info-train.txt', 'w').write(f'images: {num_images}, instances: {total_num_instances}, category: {category_counts}')
         elif image_dir == FLAGS.val_image_dir:
-            open('coco-info-val.txt', 'w').write(f'images: {num_images}, instances: {total_num_instances}')
+            open('coco-info-val.txt', 'w').write(f'images: {num_images}, instances: {total_num_instances}, category: {category_counts}')
 
         # Scene Parsing Dataset
         remapping = {
