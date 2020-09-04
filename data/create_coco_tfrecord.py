@@ -898,7 +898,6 @@ def create_tf_example(image,
 def create_scene_parse_tf_example(filename, image, masks, category_ids):
     image_id = filename.split('.')[0].split('_')[2]
     w, h = image.size
-    print(category_ids)
 
     image = image.convert('RGB')
     r = 256
