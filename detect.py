@@ -217,7 +217,7 @@ valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
 tf.print(tf.shape(anchors))
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.2, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.3, nms_threshold=0.5, anchors=anchors)
 
 for image, labels in valid_dataset.take(1):
     print('mask_target', np.count_nonzero(labels['mask_target']))
