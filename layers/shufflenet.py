@@ -9,7 +9,7 @@ class ShuffleNetV2():
         self.bn1 = tf.keras.layers.BatchNormalization(axis=-1)
         self.relu1 = tf.keras.layers.ReLU()
         self.pool1 = tf.keras.layers.MaxPool2D((3, 3), strides=2, padding='same')
-        self.channels = [24, 48, 96, 192]
+        self.channels = [24, 116, 232, 464]
         self.num_blocks = [4, 8, 4]
         self.stages = [[], [], []]
         self.shorts = []
@@ -58,7 +58,6 @@ class ShuffleNetV2():
             
 
     def gen(self):
-        # First Layer
         inputs = tf.keras.Input(shape=self.input_shape)
         c3 = None
         c4 = None
