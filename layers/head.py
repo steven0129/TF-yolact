@@ -55,8 +55,9 @@ class PredictionModule(tf.keras.layers.Layer):
         print(f'num_class = {self.num_class}')
         print(f'num_mask = {self.num_mask}')
 
-        self.input_conv = tf.keras.layers.Conv2D(out_channels, (3, 3), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform(), activation='relu')
-        
+        # self.input_conv = tf.keras.layers.Conv2D(out_channels, (3, 3), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform(), activation='relu')
+        self.input_conv = DwConv(num_filters=out_channels, dropout=0.1)
+
         # Class Branch
         self.class_heads = [tf.keras.layers.Conv2D(num_class * num_anchors, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform())]
         

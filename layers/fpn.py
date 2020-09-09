@@ -77,10 +77,6 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         self.predictP3 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
         self.predictP2 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
 
-        self.dropout6 = tf.keras.layers.Dropout(0.1)
-        self.dropout7 = tf.keras.layers.Dropout(0.1)
-
-
     def call(self, c3, c4, c5):
         # lateral conv for c3 c4 c5
         p5 = self.lateralCov1(c5)
@@ -94,9 +90,7 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
 
         # downsample conv to get p6, p7
         p6 = self.downSample1(p5)
-        p6 = self.dropout6(p6)
         p7 = self.downSample2(p6)
-        p7 = self.dropout7(p7)
 
         return [p3, p4, p5, p6, p7]
 

@@ -35,7 +35,14 @@ class MyYolact():
         print("num anchor per feature map: ", self.num_anchor)
 
         # shared prediction head
-        self.pred_head = PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask)
+        self.pred_head = [
+            PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask),
+            PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask),
+            PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask),
+            PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask),
+            PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask)
+        ]
+
         self.concat = tf.keras.layers.Concatenate(axis=1)
 
 
@@ -56,8 +63,8 @@ class MyYolact():
         all_pred_offset = []
         all_pred_mask = []
 
-        for f_map in fpn_out:
-            pred_cls, pred_offset, pred_mask = self.pred_head(f_map)
+        for idx, f_map in enumerate(fpn_out):
+            pred_cls, pred_offset, pred_mask = self.pred_head[idx](f_map)
             all_pred_cls.append(pred_cls)
             all_pred_offset.append(pred_offset)
             all_pred_mask.append(pred_mask)
