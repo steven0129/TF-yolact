@@ -57,9 +57,6 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         self.downSample1 = tf.keras.layers.Conv2D(num_fpn_filters, (3, 3), 2, padding="same",
                                                   kernel_initializer=tf.keras.initializers.glorot_uniform())
 
-        self.downSample1 = tf.keras.layers.Conv2D(num_fpn_filters, (3, 3), 2, padding="same",
-                                                  kernel_initializer=tf.keras.initializers.glorot_uniform())
-
         self.downSample2 = tf.keras.layers.Conv2D(num_fpn_filters, (3, 3), 2, padding="same",
                                                   kernel_initializer=tf.keras.initializers.glorot_uniform())
 

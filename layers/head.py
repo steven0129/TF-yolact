@@ -55,17 +55,59 @@ class PredictionModule(tf.keras.layers.Layer):
         print(f'num_class = {self.num_class}')
         print(f'num_mask = {self.num_mask}')
 
-        # self.input_conv = tf.keras.layers.Conv2D(out_channels, (3, 3), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform(), activation='relu')
         self.input_conv = DwConv(num_filters=out_channels, dropout=0.1)
 
         # Class Branch
-        self.class_heads = [tf.keras.layers.Conv2D(num_class * num_anchors, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform())]
-        
+        self.class_head_dw = tf.keras.layers.DepthwiseConv2D(
+            (3, 3), 
+            padding='same', 
+            depth_multiplier=1, 
+            strides=1, 
+            use_bias=False
+        )
+
+        self.class_head_pw = tf.keras.layers.Conv2D(
+            num_class * num_anchors, 
+            (1, 1),
+            padding='same',
+            use_bias=False,
+            strides=1,
+        )
+
         # Box Branch
-        self.box_heads = [tf.keras.layers.Conv2D(4 * self.num_anchors, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform())]
-        
+        self.box_head_dw = tf.keras.layers.DepthwiseConv2D(
+            (3, 3), 
+            padding='same', 
+            depth_multiplier=1, 
+            strides=1, 
+            use_bias=False
+        )
+
+        self.box_head_pw = tf.keras.layers.Conv2D(
+            4 * self.num_anchors, 
+            (1, 1),
+            padding='same',
+            use_bias=False,
+            strides=1,
+        )
+
+
         # Mask Branch
-        self.mask_heads = [tf.keras.layers.Conv2D(self.num_mask * self.num_anchors, (3, 3), padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform())]
+        self.mask_head_dw = tf.keras.layers.DepthwiseConv2D(
+            (3, 3), 
+            padding='same', 
+            depth_multiplier=1, 
+            strides=1, 
+            use_bias=False
+        )
+
+        self.mask_head_pw = tf.keras.layers.Conv2D(
+            self.num_mask * self.num_anchors, 
+            (1, 1),
+            padding='same',
+            use_bias=False,
+            strides=1,
+        )
 
         self.classReshape = tf.keras.layers.Reshape((-1, num_class))
         self.boxReshape = tf.keras.layers.Reshape((-1, 4))
@@ -78,14 +120,14 @@ class PredictionModule(tf.keras.layers.Layer):
         pred_box = p
         pred_mask = p
 
-        for class_head in self.class_heads:
-            pred_class = class_head(pred_class)
+        pred_class = self.class_head_dw(pred_class)
+        pred_class = self.class_head_pw(pred_class)
 
-        for box_head in self.box_heads:
-            pred_box = box_head(pred_box)
+        pred_box = self.box_head_dw(pred_box)
+        pred_box = self.box_head_pw(pred_box)
 
-        for mask_head in self.mask_heads:
-            pred_mask = mask_head(pred_mask)
+        pred_mask = self.mask_head_dw(pred_mask)
+        pred_mask = self.mask_head_pw(pred_mask)
 
         # reshape the prediction head result for following loss calculation
         pred_class = self.classReshape(pred_class)

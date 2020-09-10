@@ -53,9 +53,9 @@ class ProtoNet(tf.keras.layers.Layer):
         super(ProtoNet, self).__init__()
         
         self.conv_base = [
-                tf.keras.layers.Conv2D(256, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform(), activation="relu"),
-                tf.keras.layers.Conv2D(256, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform(), activation="relu"),
-                tf.keras.layers.Conv2D(256, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform(), activation="relu")
+            DwConv(256),
+            DwConv(256),
+            DwConv(256)
         ]
 
         self.upSampling = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')

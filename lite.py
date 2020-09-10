@@ -19,7 +19,7 @@ class MyYolact():
     def __init__(self, input_size, fpn_channels, feature_map_size, num_class, num_mask, aspect_ratio, scales):
         # use pre-trained MobileNetV2
         self.input_shape = (input_size, input_size, 3)
-        self.backbone_pretrained = ShuffleNetV2(input_shape=(self.input_shape)).gen()
+        self.backbone_pretrained = MobileNetV2(input_shape=(self.input_shape)).gen()
         self.backbone_pretrained.trainable = True
 
         # extract certain feature maps for FPN
