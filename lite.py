@@ -9,6 +9,7 @@ import tensorflow as tf
 from layers.fpn import FeaturePyramidNeck
 from layers.head import PredictionModule
 from layers.protonet import ProtoNet
+from layers.pretrained import MobileNetV1
 from layers.pretrained import MobileNetV2
 from layers.shufflenet import ShuffleNetV2
 from utils.create_prior import make_priors
@@ -80,7 +81,7 @@ class MyYolact():
 if __name__ == '__main__':
     YOLACT = MyYolact(
         input_size=256,
-        fpn_channels=256, 
+        fpn_channels=128, 
         feature_map_size=[32, 16, 8, 4, 2],
         num_class=13, # 12 classes + 1 background
         num_mask=32,
