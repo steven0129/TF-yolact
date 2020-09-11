@@ -112,6 +112,80 @@ class MobileNetV2():
         return x
 
 
+class MobileNetV1():
+    def __init__(self, input_shape, dropout=0.1):
+        self.base_model = tf.keras.applications.MobileNet(
+            input_shape=input_shape,
+            include_top=False, 
+            alpha=0.75,
+            layers=tf.keras.layers, 
+            weights='imagenet'
+        )
+
+        self.input_shape = input_shape
+        self.base_model.trainable = True
+        self.conv1_pad = self.base_model.get_layer('conv1_pad')
+        self.conv1 = self.base_model.get_layer('conv1')
+        self.conv1_bn = self.base_model.get_layer('conv1_bn')
+        self.conv1_relu = self.base_model.get_layer('conv1_relu')
+        self.dropout1 = tf.keras.layers.Dropout(dropout)
+
+        self.blocks = []
+
+        for i in range(1, 13):
+            block = {
+                'conv_dw': self.base_model.get_layer(f'conv_dw_{i}'),
+                'conv_dw_bn': self.base_model.get_layer(f'conv_dw_{i}_bn'),
+                'conv_dw_relu': tf.keras.layers.ReLU(),
+                'conv_pw': self.base_model.get_layer(f'conv_pw_{i}'),
+                'conv_pw_bn': self.base_model.get_layer(f'conv_pw_{i}_bn'),
+                'conv_pw_relu': tf.keras.layers.ReLU()
+            }
+
+            if i in [2, 4, 6, 12]:
+                block['padding'] = self.base_model.get_layer(f'conv_pad_{i}')
+
+            self.blocks.append(block)
+
+    def gen(self):
+        c3 = None
+        c4 = None
+        c5 = None
+
+        inputs = tf.keras.layers.Input(shape=self.input_shape)
+        x = self.conv1_pad(inputs)
+        x = self.conv1(x)
+        x = self.conv1_bn(x)
+        x = self.conv1_relu(x)
+        x = self.dropout1(x)
+
+        for idx, block in enumerate(self.blocks):
+            x = self.parse_block(block, x)
+            
+            if idx + 1 == 5:
+                c3 = x
+            elif idx + 1 == 11:
+                c4 = x
+
+        c5 = x
+
+        model = tf.keras.Model(inputs=inputs, outputs=[c3, c4, c5])
+        return model
+
+    def parse_block(self, block, x):
+        if 'padding' in block:
+            x = block['padding'](x)
+
+        x = block['conv_dw'](x)
+        x = block['conv_dw_bn'](x)
+        x = block['conv_dw_relu'](x)
+        x = block['conv_pw'](x)
+        x = block['conv_pw_bn'](x)
+        x = block['conv_pw_relu'](x)
+
+        return x
+
+
 if __name__ == '__main__':
     dummy_input = tf.zeros((8, 256, 256, 3))
     model = MobileNetV2(input_shape=(256, 256, 3)).gen()
