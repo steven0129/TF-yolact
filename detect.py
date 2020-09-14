@@ -191,7 +191,7 @@ lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=50
 optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=0.9)
 
 YOLACT = lite.MyYolact(input_size=256,
-               fpn_channels=256,
+               fpn_channels=128,
                feature_map_size=[32, 16, 8, 4, 2],
                num_class=13,
                num_mask=32,
