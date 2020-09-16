@@ -5,7 +5,7 @@ class MobileNetV2():
         self.base_model = tf.keras.applications.MobileNetV2(
             input_shape=input_shape, 
             include_top=False, 
-            alpha=0.75,
+            alpha=0.5,
             layers=tf.keras.layers, 
             weights='imagenet'
         )
