@@ -32,6 +32,7 @@ import io
 import json
 import os
 import cv2
+import csv
 
 import PIL.Image
 import contextlib2
@@ -51,6 +52,7 @@ from pycocotools.coco import COCO
 import pycocotools.mask as mask_util
 from skimage.measure import regionprops
 from PIL import Image
+from tqdm import tqdm
 
 from data import dataset_util
 
@@ -968,6 +970,71 @@ def create_scene_parse_tf_example(filename, image, masks, category_ids):
     example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
     return example
 
+def create_openimages_tf_example(image_id, image, masks, xmin, xmax, ymin, ymax, category_ids):
+    w, h = image.size
+
+    image = image.convert('RGB')
+    r = 256
+    image = image.resize((r, r), PIL.Image.ANTIALIAS)
+    bytes_io = io.BytesIO()
+    image.save(bytes_io, format='JPEG')
+    encoded_jpg = bytes_io.getvalue()
+    key = hashlib.sha256(encoded_jpg).hexdigest()
+    
+    areas = []
+    encoded_mask_pngs = []
+    is_crowd = []
+
+    for mask in masks:
+        areas.append(0)
+        mask = np.array(mask)
+        mask[mask > 0] = 1
+        mask = np.uint8(mask)
+
+        pil_image = PIL.Image.fromarray(mask)
+        output_io = io.BytesIO()
+        pil_image.save(output_io, format='PNG')
+        encoded_mask_pngs.append(output_io.getvalue())
+        is_crowd.append(0)
+
+    feature_dict = {
+        'image/height':
+            dataset_util.int64_feature(r),
+        'image/width':
+            dataset_util.int64_feature(r),
+        'image/filename':
+            dataset_util.bytes_feature(f'{image_id}.png'.encode('utf-8')),
+        'image/source_id':
+            dataset_util.bytes_feature(image_id.encode('utf-8')),
+        'image/key/sha256':
+            dataset_util.bytes_feature(key.encode('utf-8')),
+        'image/encoded':
+            dataset_util.bytes_feature(encoded_jpg),
+        'image/format':
+            dataset_util.bytes_feature('jpeg'.encode('utf8')),
+        'image/object/bbox/xmin':
+            dataset_util.float_list_feature(xmin),
+        'image/object/bbox/xmax':
+            dataset_util.float_list_feature(xmax),
+        'image/object/bbox/ymin':
+            dataset_util.float_list_feature(ymin),
+        'image/object/bbox/ymax':
+            dataset_util.float_list_feature(ymax),
+        'image/object/class/label_text':
+            dataset_util.bytes_list_feature(['dummy'.encode('utf-8')]),
+        'image/object/class/label_id':
+            dataset_util.int64_list_feature(category_ids),
+        'image/object/is_crowd':
+            dataset_util.int64_list_feature(is_crowd),
+        'image/object/area':
+            dataset_util.float_list_feature(areas),
+        'image/object/mask':
+            dataset_util.bytes_list_feature(encoded_mask_pngs)
+    }
+
+    example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
+    return example
+
 def _create_tf_record_from_coco_annotations(
         annotations_file, image_dir, output_path, num_shards):
     """Loads COCO annotation json files and converts to tf.Record format.
@@ -1040,24 +1107,24 @@ def _create_tf_record_from_coco_annotations(
                     shard_idx = idx % num_shards
                     output_tfrecords[shard_idx].write(tf_example.SerializeToString())
 
-                # Horizontal Flip Augmentation
-                _, tf_example, num_annotations_skipped, category_ids = create_tf_horizontal_flip_example(image, annotations_list, image_dir, category_index)
-                num_instances = len(category_ids)
-                if num_instances != 0:
-                    total_num_annotations_skipped += num_annotations_skipped
-                    total_num_instances += num_instances
-                    shard_idx = idx % num_shards
-                    output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+                # # Horizontal Flip Augmentation
+                # _, tf_example, num_annotations_skipped, category_ids = create_tf_horizontal_flip_example(image, annotations_list, image_dir, category_index)
+                # num_instances = len(category_ids)
+                # if num_instances != 0:
+                #     total_num_annotations_skipped += num_annotations_skipped
+                #     total_num_instances += num_instances
+                #     shard_idx = idx % num_shards
+                #     output_tfrecords[shard_idx].write(tf_example.SerializeToString())
 
-                # Other Data Augmentation
-                if image_dir == FLAGS.train_image_dir:
-                    _, tf_example, num_annotations_skipped, category_ids = create_tf_example_imgaug(image, annotations_list, image_dir, category_index)
-                    num_instances = len(category_ids)
-                    if num_instances != 0:
-                        total_num_annotations_skipped += num_annotations_skipped
-                        total_num_instances += num_instances
-                        shard_idx = idx % num_shards
-                        output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+                # # Other Data Augmentation
+                # if image_dir == FLAGS.train_image_dir:
+                #     _, tf_example, num_annotations_skipped, category_ids = create_tf_example_imgaug(image, annotations_list, image_dir, category_index)
+                #     num_instances = len(category_ids)
+                #     if num_instances != 0:
+                #         total_num_annotations_skipped += num_annotations_skipped
+                #         total_num_instances += num_instances
+                #         shard_idx = idx % num_shards
+                #         output_tfrecords[shard_idx].write(tf_example.SerializeToString())
             else:
                 total_num_annotations_skipped += len(annotations_list)
 
@@ -1169,6 +1236,141 @@ def _create_tf_record_from_coco_annotations(
 
                 open('scene-parse-info-train.txt', 'w').write(f'images: {num_image}, instances: {num_instances}')
 
+        # Open Images Dataset
+        with open('data/openimages-256/oidv6-class-descriptions.csv') as FILE:
+            cat_mapping = {}
+            for line in FILE:
+                line = line.strip()
+                key, val = line.split(',', maxsplit=1)
+                cat_mapping[key] = val
+
+        my_categories = [
+            'Motorcycle', 
+            'Horse', 
+            'Airplane', 
+            'Aircraft', 
+            'Cattle', 
+            'Jet ski', 
+            'Snowmobile', 
+            'Tank', 
+            'Bird', 
+            'Limousine', 
+            'Magpie', 
+            'Canary', 
+            'Woodpecker', 
+            'Dog', 
+            'Bus', 
+            'Eagle', 
+            'Falcon', 
+            'Van', 
+            'Ambulance', 
+            'Taxi', 
+            'Cat', 
+            'Car'
+        ]
+
+        remapping = {
+            'Motorcycle': 5,  # Motorbike
+            'Horse': 11,  # Horse
+            'Airplane': 6,   # Airplane
+            'Aircraft': 6,   # Airplane
+            'Cattle': 12,   # Cow
+            'Jet ski': 7,   # Ship (Boat)
+            'Snowmobile': 5,  # Motorbike
+            'Tank': 4,        # Car
+            'Bird': 8,        # Bird
+            'Limousine': 4,   # Car
+            'Magpie': 8,      # Bird
+            'Canary': 8,      # Bird
+            'Woodpecker': 8,  # Bird
+            'Dog': 10,        # Dog
+            'Bus': 4,         # Car
+            'Eagle': 8,       # Bird
+            'Falcon': 8,      # Bird
+            'Van': 4,         # Car
+            'Ambulance': 4,   # Car
+            'Taxi': 4,        # Car
+            'Cat': 9,         # Cat
+            'Car': 4    # Car
+        }
+
+        if image_dir == FLAGS.train_image_dir:
+            with open('data/openimages-256/train-annotations-object-segmentation.csv') as FILE:
+                rows = csv.DictReader(FILE)
+                hashtable = {}
+
+                print('Building hash table for open images...')
+                for row in tqdm(rows):
+                    if cat_mapping[row['LabelName']] in my_categories and (row['ImageID'].startswith('0') or row['ImageID'].startswith('1') or row['ImageID'].startswith('2') or row['ImageID'].startswith('3')) and os.path.isfile(f'data/openimages-256/train-images-256x256/{row["ImageID"]}.png'):
+                        if row['ImageID'] in hashtable:
+                            hashtable[row['ImageID']]['MaskPath'].append(row['MaskPath'])
+                            hashtable[row['ImageID']]['category_names'].append(cat_mapping[row['LabelName']])
+                            hashtable[row['ImageID']]['xmin'].append(float(row['BoxXMin']))
+                            hashtable[row['ImageID']]['xmax'].append(float(row['BoxXMax']))
+                            hashtable[row['ImageID']]['ymin'].append(float(row['BoxYMin']))
+                            hashtable[row['ImageID']]['ymax'].append(float(row['BoxYMax']))
+                        else:
+                            hashtable[row['ImageID']] = {
+                                'MaskPath': [row['MaskPath']],
+                                'category_names': [cat_mapping[row['LabelName']]],
+                                'xmin': [float(row['BoxXMin'])],
+                                'xmax': [float(row['BoxXMax'])],
+                                'ymin': [float(row['BoxYMin'])],
+                                'ymax': [float(row['BoxYMax'])],
+                            }
+
+                for idx, (imageID, data) in enumerate(tqdm(hashtable.items())):
+                    shard_idx = idx % num_shards
+                    img = Image.open(f'data/openimages-256/train-images-256x256/{imageID}.png')
+                    masks = list(map(lambda x: Image.open(f'data/openimages-256/train-masks-256x256/{x}'), data['MaskPath']))
+                    xmin = data['xmin']
+                    xmax = data['xmax']
+                    ymin = data['ymin']
+                    ymax = data['ymax']
+                    category_ids = list(map(lambda x: remapping[x], data['category_names']))
+
+                    tf_example = create_openimages_tf_example(imageID, img, masks, xmin, xmax, ymin, ymax, category_ids)
+                    output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+
+        if image_dir == FLAGS.val_image_dir:
+            with open('data/openimages-256/validation-annotations-object-segmentation.csv') as FILE:
+                rows = csv.DictReader(FILE)
+                hashtable = {}
+
+                print('Building hash table for open images...')
+                for row in tqdm(rows):
+                    if cat_mapping[row['LabelName']] in my_categories and (row['ImageID'].startswith('0') or row['ImageID'].startswith('1') or row['ImageID'].startswith('2') or row['ImageID'].startswith('3')) and os.path.isfile(f'data/openimages-256/valid-images-256x256/{row["ImageID"]}.png'):
+                        if row['ImageID'] in hashtable:
+                            hashtable[row['ImageID']]['MaskPath'].append(row['MaskPath'])
+                            hashtable[row['ImageID']]['category_names'].append(cat_mapping[row['LabelName']])
+                            hashtable[row['ImageID']]['xmin'].append(float(row['BoxXMin']))
+                            hashtable[row['ImageID']]['xmax'].append(float(row['BoxXMax']))
+                            hashtable[row['ImageID']]['ymin'].append(float(row['BoxYMin']))
+                            hashtable[row['ImageID']]['ymax'].append(float(row['BoxYMax']))
+                        else:
+                            hashtable[row['ImageID']] = {
+                                'MaskPath': [row['MaskPath']],
+                                'category_names': [cat_mapping[row['LabelName']]],
+                                'xmin': [float(row['BoxXMin'])],
+                                'xmax': [float(row['BoxXMax'])],
+                                'ymin': [float(row['BoxYMin'])],
+                                'ymax': [float(row['BoxYMax'])],
+                            }
+
+                for idx, (imageID, data) in enumerate(tqdm(hashtable.items())):
+                    shard_idx = idx % num_shards
+                    img = Image.open(f'data/openimages-256/valid-images-256x256/{imageID}.png')
+                    masks = list(map(lambda x: Image.open(f'data/openimages-256/valid-masks-256x256/{x}'), data['MaskPath']))
+                    xmin = data['xmin']
+                    xmax = data['xmax']
+                    ymin = data['ymin']
+                    ymax = data['ymax']
+                    category_ids = list(map(lambda x: remapping[x], data['category_names']))
+
+                    tf_example = create_openimages_tf_example(imageID, img, masks, xmin, xmax, ymin, ymax, category_ids)
+                    output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+
+
 def main(_):
     assert FLAGS.train_image_dir, '`train_image_dir` missing.'
     assert FLAGS.val_image_dir, '`val_image_dir` missing.'
@@ -1179,8 +1381,8 @@ def main(_):
 
     if not tf.io.gfile.isdir(FLAGS.output_dir):
         tf.io.gfile.makedirs(FLAGS.output_dir)
-    train_output_path = os.path.join(FLAGS.output_dir, 'coco_train.record')
-    val_output_path = os.path.join(FLAGS.output_dir, 'coco_val.record')
+    train_output_path = os.path.join(FLAGS.output_dir, 'obj_train.record')
+    val_output_path = os.path.join(FLAGS.output_dir, 'obj_val.record')
     # testdev_output_path = os.path.join(FLAGS.output_dir, 'coco_testdev.record')
 
     _create_tf_record_from_coco_annotations(

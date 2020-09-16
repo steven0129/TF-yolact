@@ -212,7 +212,7 @@ print("Restore Ckpt Sucessfully!!")
 # Need default anchor
 anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
 valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
-                                                tfrecord_dir='data/coco_tfrecord_256x256_20200903',
+                                                tfrecord_dir='data/obj_tfrecord_256x256_20200916',
                                                 batch_size=1,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
