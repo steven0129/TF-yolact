@@ -154,8 +154,9 @@ class MobileNetV2():
 
             if idx + 1 == 9:
                 c4 = x
-        
-        c5 = x
+
+            if idx + 1 == 15:
+                c5 = x
 
         for idx, block in enumerate(self.down_blocks):
             x = self.parse_block(block, x)
