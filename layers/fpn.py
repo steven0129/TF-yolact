@@ -68,26 +68,33 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
                                                   kernel_initializer=tf.keras.initializers.glorot_uniform())
         self.lateralCov4 = tf.keras.layers.Conv2D(num_fpn_filters, (1, 1), 1, padding="same",
                                                   kernel_initializer=tf.keras.initializers.glorot_uniform())
+        self.lateralCov5 = tf.keras.layers.Conv2D(num_fpn_filters, (1, 1), 1, padding="same",
+                                                  kernel_initializer=tf.keras.initializers.glorot_uniform())
 
+        self.predictP7 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
+        self.predictP6 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
         self.predictP5 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
         self.predictP4 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
         self.predictP3 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
-        self.predictP2 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
 
-    def call(self, c3, c4, c5):
+    def call(self, c3, c4, c5, c6, c7):
         # lateral conv for c3 c4 c5
-        p5 = self.lateralCov1(c5)
-        p4 = self._crop_and_add(self.upSample(p5), self.lateralCov2(c4))
-        p3 = self._crop_and_add(self.upSample(p4), self.lateralCov3(c3))
+        p7 = self.lateralCov1(c7)
+        p6 = self._crop_and_add(self.upSample(p7), self.lateralCov2(c6))
+        p5 = self._crop_and_add(self.upSample(p6), self.lateralCov3(c5))
+        p4 = self._crop_and_add(self.upSample(p5), self.lateralCov4(c4))
+        p3 = self._crop_and_add(self.upSample(p4), self.lateralCov5(c3))
 
         # smooth pred layer for p3, p4, p5
-        p3 = self.predictP3(p3)
-        p4 = self.predictP4(p4)
-        p5 = self.predictP5(p5)
+        # p3 = self.predictP3(p3)
+        # p4 = self.predictP4(p4)
+        # p5 = self.predictP5(p5)
+        # p6 = self.predictP6(p6)
+        # p7 = self.predictP7(p7)
 
         # downsample conv to get p6, p7
-        p6 = self.downSample1(p5)
-        p7 = self.downSample2(p6)
+        # p6 = self.downSample1(p5)
+        # p7 = self.downSample2(p6)
 
         return [p3, p4, p5, p6, p7]
 

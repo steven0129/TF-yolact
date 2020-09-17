@@ -49,8 +49,8 @@ class MyYolact():
 
     def gen(self):
         inputs = tf.keras.Input(shape=self.input_shape)
-        c3, c4, c5 = self.backbone_pretrained(inputs)
-        fpn_out = self.backbone_fpn(c3, c4, c5)
+        c3, c4, c5, c6, c7 = self.backbone_pretrained(inputs)
+        fpn_out = self.backbone_fpn(c3, c4, c5, c6, c7)
         p3 = fpn_out[0]
 
         # Protonet Branch
