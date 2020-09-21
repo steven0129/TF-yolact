@@ -74,7 +74,6 @@ class Detect(object):
         # tf.print(tf.math.bincount(conf_score_id, dtype=tf.dtypes.int64))
 
         # filter out the ROI that have conf score > confidence threshold
-        tf.print('highest score', tf.reduce_max(conf_score))
         candidate_ROI_idx = tf.squeeze(tf.where(conf_score > self.conf_threshold))
         tf.print("candidate_ROI", tf.shape(candidate_ROI_idx))
 
@@ -104,6 +103,8 @@ class Detect(object):
         scores = tf.gather(scores, selected_indices)
         masks = tf.gather(masks, selected_indices)
         classes = tf.gather(classes, selected_indices)
+
+        print("final scores", scores)
 
         # apply fast nms for final detection
         # top_k = tf.math.minimum(self.top_k, tf.size(candidate_ROI_idx))
@@ -217,7 +218,7 @@ valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
 tf.print(tf.shape(anchors))
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.3, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.4, nms_threshold=0.5, anchors=anchors)
 
 for image, labels in valid_dataset.take(1):
     print('mask_target', np.count_nonzero(labels['mask_target']))
@@ -266,13 +267,14 @@ for image, labels in valid_dataset.take(1):
         ]
 
         print(remapping[gt_cls[0][idx]])
-        cv2.putText(image, remapping[gt_cls[0][idx]], (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_DUPLEX,
-                    0.5, (0, 0, 255), 1)
+        cv2.putText(image, remapping[gt_cls[0][idx]], (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.3, (0, 0, 255), 1)
 
     print('---------------------')
     # show the prediction box
     for idx in range(bbox.shape[0]):
         b = bbox[idx]
+        score = scores[idx]
         cv2.rectangle(image, (b[1], b[0]), (b[3], b[2]), (255, 0, 0), 2)
 
         remapping = [
@@ -293,7 +295,7 @@ for image, labels in valid_dataset.take(1):
 
 
         print(remapping[my_cls[idx]+1])
-        cv2.putText(image, remapping[my_cls[idx]+1], (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1)
+        cv2.putText(image, f'{remapping[my_cls[idx]+1]} {score: .3f}', (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 0, 0), 1)
 
     cv2.imwrite('result.png', image)
 
