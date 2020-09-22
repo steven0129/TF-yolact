@@ -8,6 +8,7 @@ from tensorboard.plugins.hparams import api as hp
 from absl import app
 from absl import flags
 from absl import logging
+from exporter import TFLiteExporter
 
 import yolact
 from data import dataset_coco
@@ -298,10 +299,8 @@ def main(argv):
                                             trainer.v_seg.result()))
                 
                 best_val = trainer.valid_loss.result()
-                converter = tf.lite.TFLiteConverter.from_keras_model(model)
-                tflite_model = converter.convert()
-                with tf.io.gfile.GFile('./weights/yolact_' + str(iterations) + '.tflite', 'wb') as F:
-                    F.write(tflite_model)
+                exporter = TFLiteExporter(model)
+                exporter.export('./weights/yolact_' + str(iterations) + '.tflite')
 
         trainer.reset_states()
 

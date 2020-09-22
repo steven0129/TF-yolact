@@ -78,10 +78,29 @@ class MyYolact():
 
         return model
 
+class TFLiteExporter():
+    def __init__(self, model, input_size=256):
+        self.model = model
+        self.input_shape = (input_size, input_size, 3)
+        self.sigmoid = tf.keras.layers.Activation('sigmoid')
+        self.softmax = tf.keras.layers.Softmax()
+
+    def export(self, filename):
+        inputs = tf.keras.Input(shape=self.input_shape)
+        _, protonet_out, cls_result, offset_result, mask_result = self.model(inputs)
+        cls_result = self.softmax(cls_result)
+        mask_result = self.sigmoid(mask_result)
+
+        wrapper = tf.keras.Model(inputs, [protonet_out, cls_result, offset_result, mask_result])
+        converter = tf.lite.TFLiteConverter.from_keras_model(wrapper)
+        tflite_model = converter.convert()
+        with tf.io.gfile.GFile(filename, 'wb') as F:
+            F.write(tflite_model)
+
 if __name__ == '__main__':
     YOLACT = MyYolact(
         input_size=256,
-        fpn_channels=128, 
+        fpn_channels=96, 
         feature_map_size=[32, 16, 8, 4, 2],
         num_class=13, # 12 classes + 1 background
         num_mask=32,
@@ -90,7 +109,5 @@ if __name__ == '__main__':
     )
 
     model = YOLACT.gen()
-    converter = tf.lite.TFLiteConverter.from_keras_model(model)
-    tflite_model = converter.convert()
-    with tf.io.gfile.GFile('yolact.tflite', 'wb') as F:
-        F.write(tflite_model)
+    exporter = TFLiteExporter(model)
+    exporter.export('yolact.tflite')
