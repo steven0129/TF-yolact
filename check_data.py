@@ -148,7 +148,7 @@ def main(argv):
     # Creating the instance of the model specified.
     logging.info("Creating the model instance of YOLACT")
     YOLACT = lite.MyYolact(input_size=256,
-                          fpn_channels=256,
+                          fpn_channels=96,
                           feature_map_size=[32, 16, 8, 4, 2],
                           num_class=13, # 12 classes + 1 background
                           num_mask=32,
