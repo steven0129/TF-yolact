@@ -95,6 +95,8 @@ class Detect(object):
             masks = tf.expand_dims(masks, axis=0)
             classes = tf.expand_dims(classes, axis=0)
 
+            print("final scores", scores)
+
             return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
 
         selected_indices = tf.image.non_max_suppression(boxes, scores, 100, self.nms_threshold)
@@ -218,7 +220,7 @@ valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
 tf.print(tf.shape(anchors))
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.4, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.3, nms_threshold=0.5, anchors=anchors)
 
 for image, labels in valid_dataset.take(1):
     print('mask_target', np.count_nonzero(labels['mask_target']))

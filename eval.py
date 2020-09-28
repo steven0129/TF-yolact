@@ -142,7 +142,7 @@ lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=50
 optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=0.9)
 
 YOLACT = lite.MyYolact(input_size=256,
-               fpn_channels=128,
+               fpn_channels=96,
                feature_map_size=[32, 16, 8, 4, 2],
                num_class=13,
                num_mask=32,
@@ -167,7 +167,7 @@ valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
                                                 batch_size=1,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.4, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.3, nms_threshold=0.5, anchors=anchors)
 
 remapping = [
     'Background',
