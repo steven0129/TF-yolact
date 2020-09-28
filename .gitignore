@@ -7,5 +7,5 @@ data/val2017.zip
 data/coco/
 checkpoints/
 logs/
-weights/
+weights/*.tflite
 __pycache__/
