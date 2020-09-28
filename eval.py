@@ -162,9 +162,8 @@ print("Restore Ckpt Sucessfully!!")
 # -----------------------------------------------------------------------------------------------
 # Need default anchor
 anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
-valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
-                                                tfrecord_dir='data/obj_tfrecord_256x256_20200916',
-                                                batch_size=1,
+valid_dataset = dataset_coco.prepare_evalloader(img_size=256,
+                                                tfrecord_dir='data/obj_tfrecord_256x256_20200921',
                                                 subset='val')
 anchors = anchorobj.get_anchors()
 detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.3, nms_threshold=0.5, anchors=anchors)
@@ -187,7 +186,7 @@ remapping = [
 
 confusion_matrix = [[0 for _ in range(13)] for j in range(13)]
 
-for image, labels in tqdm(valid_dataset.take(3000)):
+for image, labels in tqdm(valid_dataset):
     # only try on 1 image
     output = model(image, training=False)
     detection = detect_layer(output)
