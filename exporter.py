@@ -28,7 +28,7 @@ class TFLiteExporter():
             F.write(tflite_model)
 
 class MongoExporter():
-    def __init__(self, tfrecord_dir, subset='train'):
+    def __init__(self, tfrecord_dir, col_name, subset='train'):
         self.tfrecord_dir = tfrecord_dir
         self.keys2features = {
             'image/source_id': tf.io.FixedLenFeature([], dtype=tf.string),
@@ -52,7 +52,7 @@ class MongoExporter():
             authMechanism='SCRAM-SHA-256'
         )
 
-        self.collection = client['obj']['obj_256x256_20200921']
+        self.collection = client['obj'][col_name]
         self.fs = gridfs.GridFS(client['obj'])
 
         files = os.listdir(tfrecord_dir)
@@ -151,8 +151,8 @@ class MongoExporter():
     
 
 if __name__ == '__main__':
-    exporter = MongoExporter('data/obj_tfrecord_256x256_test', subset='val')
+    exporter = MongoExporter('data/obj_tfrecord_256x256_20200930', 'obj_256x256_20200930', subset='val')
     exporter.export()
     
-    exporter = MongoExporter('data/obj_tfrecord_256x256_test', subset='train')
+    exporter = MongoExporter('data/obj_tfrecord_256x256_20200930', 'obj_256x256_20200930', subset='train')
     exporter.export()

@@ -1237,7 +1237,7 @@ def _create_tf_record_from_coco_annotations(
                 open('scene-parse-info-train.txt', 'w').write(f'images: {num_image}, instances: {num_instances}')
 
         # Open Images Dataset
-        with open('data/openimages-20200921/oidv6-class-descriptions.csv') as FILE:
+        with open('data/openimages-20200928/oidv6-class-descriptions.csv') as FILE:
             cat_mapping = {}
             for line in FILE:
                 line = line.strip()
@@ -1295,13 +1295,13 @@ def _create_tf_record_from_coco_annotations(
         }
 
         if image_dir == FLAGS.train_image_dir:
-            with open('data/openimages-20200921/train-annotations-object-segmentation.csv') as FILE:
+            with open('data/openimages-20200928/train-annotations-object-segmentation.csv') as FILE:
                 rows = csv.DictReader(FILE)
                 hashtable = {}
 
                 print('Building hash table for open images...')
                 for row in tqdm(rows):
-                    if cat_mapping[row['LabelName']] in my_categories and (row['ImageID'].startswith('0') or row['ImageID'].startswith('1') or row['ImageID'].startswith('2') or row['ImageID'].startswith('3') or row['ImageID'].startswith('4') or row['ImageID'].startswith('5') or row['ImageID'].startswith('6') or row['ImageID'].startswith('7') or row['ImageID'].startswith('8')) and os.path.isfile(f'data/openimages-20200921/train-images-256x256/{row["ImageID"]}.png'):
+                    if cat_mapping[row['LabelName']] in my_categories and (row['ImageID'].startswith('0') or row['ImageID'].startswith('1') or row['ImageID'].startswith('2') or row['ImageID'].startswith('3') or row['ImageID'].startswith('4') or row['ImageID'].startswith('5') or row['ImageID'].startswith('6') or row['ImageID'].startswith('7') or row['ImageID'].startswith('8') or row['ImageID'].startswith('9') or row['ImageID'].startswith('a') or row['ImageID'].startswith('b') or row['ImageID'].startswith('c')) and os.path.isfile(f'data/openimages-20200928/train-images-256x256/{row["ImageID"]}.png'):
                         if row['ImageID'] in hashtable:
                             hashtable[row['ImageID']]['MaskPath'].append(row['MaskPath'])
                             hashtable[row['ImageID']]['category_names'].append(cat_mapping[row['LabelName']])
@@ -1321,8 +1321,8 @@ def _create_tf_record_from_coco_annotations(
 
                 for idx, (imageID, data) in enumerate(tqdm(hashtable.items())):
                     shard_idx = idx % num_shards
-                    img = Image.open(f'data/openimages-20200921/train-images-256x256/{imageID}.png')
-                    masks = list(map(lambda x: Image.open(f'data/openimages-20200921/train-masks-256x256/{x}'), data['MaskPath']))
+                    img = Image.open(f'data/openimages-20200928/train-images-256x256/{imageID}.png')
+                    masks = list(map(lambda x: Image.open(f'data/openimages-20200928/train-masks-256x256/{x}'), data['MaskPath']))
                     xmin = data['xmin']
                     xmax = data['xmax']
                     ymin = data['ymin']
@@ -1333,13 +1333,13 @@ def _create_tf_record_from_coco_annotations(
                     output_tfrecords[shard_idx].write(tf_example.SerializeToString())
 
         if image_dir == FLAGS.val_image_dir:
-            with open('data/openimages-20200921/validation-annotations-object-segmentation.csv') as FILE:
+            with open('data/openimages-20200928/validation-annotations-object-segmentation.csv') as FILE:
                 rows = csv.DictReader(FILE)
                 hashtable = {}
 
                 print('Building hash table for open images...')
                 for row in tqdm(rows):
-                    if cat_mapping[row['LabelName']] in my_categories and (row['ImageID'].startswith('0') or row['ImageID'].startswith('1') or row['ImageID'].startswith('2') or row['ImageID'].startswith('3') or row['ImageID'].startswith('4') or row['ImageID'].startswith('5') or row['ImageID'].startswith('6') or row['ImageID'].startswith('7') or row['ImageID'].startswith('8')) and os.path.isfile(f'data/openimages-20200921/valid-images-256x256/{row["ImageID"]}.png'):
+                    if cat_mapping[row['LabelName']] in my_categories and (row['ImageID'].startswith('0') or row['ImageID'].startswith('1') or row['ImageID'].startswith('2') or row['ImageID'].startswith('3') or row['ImageID'].startswith('4') or row['ImageID'].startswith('5') or row['ImageID'].startswith('6') or row['ImageID'].startswith('7') or row['ImageID'].startswith('8') or row['ImageID'].startswith('9') or row['ImageID'].startswith('a') or row['ImageID'].startswith('b') or row['ImageID'].startswith('c')) and os.path.isfile(f'data/openimages-20200928/valid-images-256x256/{row["ImageID"]}.png'):
                         if row['ImageID'] in hashtable:
                             hashtable[row['ImageID']]['MaskPath'].append(row['MaskPath'])
                             hashtable[row['ImageID']]['category_names'].append(cat_mapping[row['LabelName']])
@@ -1359,8 +1359,8 @@ def _create_tf_record_from_coco_annotations(
 
                 for idx, (imageID, data) in enumerate(tqdm(hashtable.items())):
                     shard_idx = idx % num_shards
-                    img = Image.open(f'data/openimages-20200921/valid-images-256x256/{imageID}.png')
-                    masks = list(map(lambda x: Image.open(f'data/openimages-20200921/valid-masks-256x256/{x}'), data['MaskPath']))
+                    img = Image.open(f'data/openimages-20200928/valid-images-256x256/{imageID}.png')
+                    masks = list(map(lambda x: Image.open(f'data/openimages-20200928/valid-masks-256x256/{x}'), data['MaskPath']))
                     xmin = data['xmin']
                     xmax = data['xmax']
                     ymin = data['ymin']
