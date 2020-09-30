@@ -53,13 +53,13 @@ class ProtoNet(tf.keras.layers.Layer):
         super(ProtoNet, self).__init__()
         
         self.conv_base = [
-            DwConv(128),
-            DwConv(128),
-            DwConv(128)
+            DwConv(96),
+            DwConv(96),
+            DwConv(96)
         ]
 
         self.upSampling = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')
-        self.conv_up = [DwConv(128)]
+        self.conv_up = [DwConv(96)]
         self.conv_final = tf.keras.layers.Conv2D(num_prototype, (3, 3), 1, padding="same", kernel_initializer=tf.keras.initializers.glorot_uniform(), activation="relu")
 
     def call(self, x):

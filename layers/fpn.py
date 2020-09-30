@@ -42,6 +42,34 @@ class DwConv(tf.keras.layers.Layer):
 
         return x
 
+class FastNormalizedFusion(tf.keras.layers.Layer):
+    def __init__(self, epsilon=1e-4):
+        super(FastNormalizedFusion, self).__init__()
+        self.epsilon = epsilon
+        
+
+    def build(self, input_shape):
+        self.w = self.add_weight(
+            name=self.name,
+            shape=(2,),
+            initializer=tf.keras.initializers.constant(1 / 2),
+            trainable=True,
+            dtype=tf.float32
+        )
+
+    def call(self, x1, x2):
+        x1_shape = x1.shape
+        x2_shape = x2.shape
+        offsets = [0, (x1_shape[1] - x2_shape[1]) // 2, (x1_shape[2] - x2_shape[2]) // 2, 0]
+        size = [-1, x2_shape[1], x2_shape[2], -1]
+        x1_crop = tf.slice(x1, offsets, size)
+
+        w = tf.keras.activations.relu(self.w)
+        x = w[0] * x1_crop + w[1] * x2
+        x = x / (w[0] + w[1] + self.epsilon)
+
+        return x
+
 class FeaturePyramidNeck(tf.keras.layers.Layer):
     """
         Creating the backbone component of feature Pyramid Network
@@ -77,13 +105,18 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         self.predictP4 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
         self.predictP3 = DwConv(num_filters=num_fpn_filters, dropout=0.1)
 
+        self.fusion6 = FastNormalizedFusion()
+        self.fusion5 = FastNormalizedFusion()
+        self.fusion4 = FastNormalizedFusion()
+        self.fusion3 = FastNormalizedFusion()
+
     def call(self, c3, c4, c5, c6, c7):
         # lateral conv for c3 c4 c5
         p7 = self.lateralCov1(c7)
-        p6 = self._crop_and_add(self.upSample(p7), self.lateralCov2(c6))
-        p5 = self._crop_and_add(self.upSample(p6), self.lateralCov3(c5))
-        p4 = self._crop_and_add(self.upSample(p5), self.lateralCov4(c4))
-        p3 = self._crop_and_add(self.upSample(p4), self.lateralCov5(c3))
+        p6 = self.fusion6(self.upSample(p7), self.lateralCov2(c6))
+        p5 = self.fusion5(self.upSample(p6), self.lateralCov3(c5))
+        p4 = self.fusion4(self.upSample(p5), self.lateralCov4(c4))
+        p3 = self.fusion3(self.upSample(p4), self.lateralCov5(c3))
 
         # smooth pred layer for p3, p4, p5
         # p3 = self.predictP3(p3)
