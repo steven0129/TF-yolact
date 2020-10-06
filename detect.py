@@ -33,6 +33,7 @@ class Detect(object):
         loc_pred = prediction['pred_offset']
         tf.print('loc pred', tf.shape(loc_pred))
         cls_pred = prediction['pred_cls']
+        tf.print(tf.math.sigmoid(cls_pred[:, 0]))
         tf.print('cls pred', tf.shape(cls_pred))
         mask_pred = prediction['pred_mask_coef']
         tf.print('mask pred', tf.shape(mask_pred))
@@ -44,12 +45,6 @@ class Detect(object):
         num_anchors = tf.shape(loc_pred)[1]
         tf.print("num batch:", num_batch)
         tf.print("num anchors:", num_anchors)
-
-        # apply softmax to pred_cls
-        cls_pred = tf.nn.softmax(cls_pred, axis=-1)
-        tf.print("score", tf.shape(cls_pred))
-        cls_pred = tf.transpose(cls_pred, perm=[0, 2, 1])
-        tf.print("score", tf.shape(cls_pred))
 
         for batch_idx in tf.range(num_batch):
             # add offset to anchors
@@ -65,7 +60,10 @@ class Detect(object):
     def _detection(self, batch_idx, cls_pred, decoded_boxes, mask_pred):
         # we don't need to deal with background label
         tf.print(f'cls_pred: {tf.shape(cls_pred)}')
-        cur_score = cls_pred[batch_idx, 1:, :]
+        objectness = tf.math.sigmoid(cls_pred[batch_idx, :, 0])
+        classification = tf.nn.softmax(cls_pred[batch_idx, :, 1:], axis=-1)
+
+        cur_score = tf.transpose( tf.reshape(objectness, [-1, 1]) * classification , perm=[1, 0])
         tf.print("cur score:", tf.shape(cur_score))
         conf_score = tf.math.reduce_max(cur_score, axis=0)
         conf_score_id = tf.argmax(cur_score, axis=0)
