@@ -11,7 +11,7 @@ client = MongoClient(
     authMechanism='SCRAM-SHA-256'
 )
 
-collection = client['obj']['obj_256x256_20200921']
+collection = client['obj']['obj_256x256_20200930']
 obj_count_in_single_img = [0] * 100
 label_id_total = []
 
