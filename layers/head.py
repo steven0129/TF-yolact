@@ -1,4 +1,5 @@
 import tensorflow as tf
+import math
 
 class DwConv(tf.keras.layers.Layer):
     def __init__(self, num_filters, dropout=None):
@@ -6,7 +7,8 @@ class DwConv(tf.keras.layers.Layer):
         self.conv_dw = tf.keras.layers.DepthwiseConv2D(
             (3, 3), 
             padding='same', 
-            depth_multiplier=1, 
+            depth_multiplier=1,
+            depthwise_initializer=tf.keras.initializers.RandomNormal(stddev=0.01),
             strides=1, 
             use_bias=False
         )
@@ -17,8 +19,9 @@ class DwConv(tf.keras.layers.Layer):
             num_filters, 
             (1, 1),
             padding='same',
+            kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01),
             use_bias=False,
-            strides=1,
+            strides=1
         )
 
         self.conv_bn_pw = tf.keras.layers.BatchNormalization(axis=-1)
@@ -42,6 +45,18 @@ class DwConv(tf.keras.layers.Layer):
 
         return x
 
+class FocalBiasInitializer(tf.keras.initializers.Initializer):
+    def __init__(self, probability=0.01):
+        self.probability = probability
+
+    def get_config(self):
+        return {
+            'probability': self.probability
+        }
+
+    def __call__(self, shape, dtype=None):
+        return tf.keras.backend.ones(shape, dtype=dtype) * -math.log((1 - self.probability) / self.probability)
+
 class PredictionModule(tf.keras.layers.Layer):
 
     def __init__(self, out_channels, num_anchors, num_class, num_mask):
@@ -58,20 +73,29 @@ class PredictionModule(tf.keras.layers.Layer):
         self.input_conv = DwConv(num_filters=out_channels, dropout=0.1)
 
         # Class Branch
-        self.class_head_dw = tf.keras.layers.DepthwiseConv2D(
-            (3, 3), 
-            padding='same', 
-            depth_multiplier=1, 
-            strides=1, 
-            use_bias=False
-        )
+        # self.class_head_dw = tf.keras.layers.DepthwiseConv2D(
+        #     (3, 3), 
+        #     padding='same', 
+        #     depth_multiplier=1, 
+        #     strides=1, 
+        #     use_bias=False
+        # )
 
-        self.class_head_pw = tf.keras.layers.Conv2D(
-            num_class * num_anchors, 
-            (1, 1),
+        # self.class_head_pw = tf.keras.layers.Conv2D(
+        #     num_class * num_anchors, 
+        #     (1, 1),
+        #     padding='same',
+        #     use_bias=False,
+        #     strides=1,
+        # )
+
+        self.class_seperable_conv = tf.keras.layers.SeparableConv2D(
+            num_class * num_anchors,
+            (3, 3),
             padding='same',
-            use_bias=False,
-            strides=1,
+            depthwise_initializer=tf.keras.initializers.RandomNormal(mean=0, stddev=0.01),
+            pointwise_initializer=tf.keras.initializers.RandomNormal(mean=0, stddev=0.01),
+            bias_initializer=FocalBiasInitializer(probability=0.01)
         )
 
         # Box Branch
@@ -120,8 +144,9 @@ class PredictionModule(tf.keras.layers.Layer):
         pred_box = p
         pred_mask = p
 
-        pred_class = self.class_head_dw(pred_class)
-        pred_class = self.class_head_pw(pred_class)
+        # pred_class = self.class_head_dw(pred_class)
+        # pred_class = self.class_head_pw(pred_class)
+        pred_class = self.class_seperable_conv(pred_class)
 
         pred_box = self.box_head_dw(pred_box)
         pred_box = self.box_head_pw(pred_box)

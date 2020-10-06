@@ -1,5 +1,6 @@
 import tensorflow as tf
 import time
+import tensorflow_addons as tfa
 from utils import utils
 
 class YOLACTLoss(object):
@@ -18,6 +19,7 @@ class YOLACTLoss(object):
         self._max_masks_for_train = max_masks_for_train
         self.focal_loss_alpha = 0.25
         self.focal_loss_gamma = 2
+        self.focal_loss_with_logits = tfa.losses.SigmoidFocalCrossEntropy(from_logits=True)
 
     def __call__(self, pred, label, num_classes):
         """
@@ -48,6 +50,7 @@ class YOLACTLoss(object):
         loc_loss = self._loss_location(pred_offset, box_targets, positiveness) * self._loss_weight_box
         # conf_loss = self._loss_class(pred_cls, cls_targets, num_classes, positiveness) * self._loss_weight_cls
         conf_loss = self._focal_conf_objectness_loss(pred_cls, cls_targets, num_classes) * self._loss_weight_cls
+        #conf_loss = self._focal_loss(pred_cls, cls_targets, num_classes) * self._loss_weight_cls
         mask_loss = self._loss_mask(proto_out, pred_mask_coef, bbox_norm, masks, positiveness, max_id_for_anchors,
                                     max_masks_for_train=100) * self._loss_weight_mask
         seg_loss = self._loss_semantic_segmentation(seg, masks, classes, num_obj) * self._loss_weight_seg
@@ -123,6 +126,11 @@ class YOLACTLoss(object):
 
         return loss_conf
 
+    def _focal_loss(self, pred_cls, gt_cls, num_cls):
+        pred_cls = tf.reshape(pred_cls, [-1, num_cls]) # [batch * num_anchor, num_cls]
+        gt_cls = tf.reshape(gt_cls, [-1]) # [batch * num_anchor]
+        return tf.reduce_sum(self.focal_loss_with_logits(y_true=gt_cls, y_pred=pred_cls))
+
     def _focal_conf_objectness_loss(self, pred_cls, gt_cls, num_cls):
         # Objectness Score First
         pred_cls = tf.reshape(pred_cls, [-1, num_cls])  # [batch * num_anchor, num_cls]
@@ -131,27 +139,17 @@ class YOLACTLoss(object):
         keep = tf.cast(gt_cls >= 0, tf.float32)
         gt_cls = tf.nn.relu(gt_cls)  # remove negative value
 
-        background = tf.cast(gt_cls == 0, dtype=tf.float32)
-
-        # If background = 1, at = 1-alpha
-        # If background = 0, at = alpha
-        at = (1 - self.focal_loss_alpha) * background + self.focal_loss_alpha * (1 - background)
-
-        # If background = 0, logpt = sigmoid(pred)
-        # If background = 1, logpt = sigmoid(-pred)
-        logpt = tf.math.log_sigmoid(pred_cls[:, 0]) * (1 - background) + tf.math.log_sigmoid(-pred_cls[:, 0]) * background
-        obj_loss = -at * (1 - tf.exp(logpt)) ** self.focal_loss_gamma * logpt
+        foreground = tf.cast(gt_cls != 0, dtype=tf.float32)
+        obj_loss = self.focal_loss_with_logits(y_true=foreground, y_pred=pred_cls[:, 0])
 
         # Now time for the class confidence loss
         pos_mask = gt_cls > 0
         pred_data_positive = (pred_cls[:, 1:])[pos_mask]
         gt_cls_positive = gt_cls[pos_mask] - 1   # Remove background class
-
         gt_cls_positive = tf.one_hot(tf.cast(gt_cls_positive, tf.int64), depth=num_cls - 1)
-        num_pos = tf.shape(gt_cls)[0]
-        class_loss = tf.nn.softmax_cross_entropy_with_logits(pred_data_positive, gt_cls_positive)
+        class_loss = tf.nn.softmax_cross_entropy_with_logits(labels=gt_cls_positive, logits=pred_data_positive)
 
-        return tf.reduce_sum(tf.reduce_sum(class_loss) + tf.reduce_sum(obj_loss * keep))
+        return tf.reduce_sum(class_loss) / tf.cast( tf.shape(gt_cls_positive)[0], tf.float32 ) + tf.reduce_sum(obj_loss * keep) /  tf.cast( tf.reduce_sum(keep), tf.float32 )
 
     def _loss_mask(self, proto_output, pred_mask_coef, gt_bbox_norm, gt_masks, positiveness,
                    max_id_for_anchors, max_masks_for_train):
