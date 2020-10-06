@@ -23,6 +23,7 @@ class TFLiteExporter():
 
         wrapper = tf.keras.Model(inputs, [protonet_out, cls_result, offset_result, mask_result])
         converter = tf.lite.TFLiteConverter.from_keras_model(wrapper)
+        converter.experimental_new_converter=False
         tflite_model = converter.convert()
         with tf.io.gfile.GFile(filename, 'wb') as F:
             F.write(tflite_model)
