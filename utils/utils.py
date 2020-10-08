@@ -204,6 +204,9 @@ def postprocess(detection, w, h, batch_idx, intepolation_mode="bilinear", crop_m
     dets = detection[batch_idx]
     dets = dets['detection']
 
+    if dets == None:
+        return None
+
     # Todo: If dets is None
     # Todo: If scorethreshold is not zero
     """

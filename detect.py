@@ -58,9 +58,9 @@ class Detect(object):
         return out
 
     def _detection(self, batch_idx, cls_pred, decoded_boxes, mask_pred):
-        # we don't need to deal with background label
         tf.print(f'cls_pred: {tf.shape(cls_pred)}')
         objectness = tf.math.sigmoid(cls_pred[batch_idx, :, 0])
+        tf.print( 'objectness:', tf.boolean_mask(objectness, objectness > 0.5) )
         classification = tf.nn.softmax(cls_pred[batch_idx, :, 1:], axis=-1)
 
         cur_score = tf.transpose( tf.reshape(objectness, [-1, 1]) * classification , perm=[1, 0])
@@ -96,7 +96,7 @@ class Detect(object):
             print("final scores", scores)
 
             return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
-
+        
         selected_indices = tf.image.non_max_suppression(boxes, scores, 100, self.nms_threshold)
 
         boxes = tf.gather(boxes, selected_indices)
@@ -221,94 +221,103 @@ tf.print(tf.shape(anchors))
 detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.3, nms_threshold=0.5, anchors=anchors)
 
 for image, labels in valid_dataset.take(1):
-    print('mask_target', np.count_nonzero(labels['mask_target']))
+    tf.print( 'classes', tf.boolean_mask(labels['classes'], labels['classes'] > 0) )
     # only try on 1 image
     output = model(image, training=False)
     detection = detect_layer(output)
     print(len(detection))
 
-    my_cls, scores, bbox, masks = postprocess(detection, 256, 256, 0, 'bilinear')
+    dets = postprocess(detection, 256, 256, 0, 'bilinear')
 
-    tf.print(f'cls: {tf.shape(my_cls)}')
-    tf.print(f'scores: {tf.shape(scores)}')
-    tf.print(f'bbox: {tf.shape(bbox)}')
-    tf.print(f'masks: {tf.shape(masks)}')
+    if dets != None:
+        my_cls, scores, bbox, masks = dets
 
-    my_cls, scores, bbox, masks = my_cls.numpy(), scores.numpy(), bbox.numpy(), masks.numpy()
-    image = denormalize_image(image)
-    
-    image = tf.squeeze(image).numpy()
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    cv2.imwrite('origin.png', image)
+        tf.print(f'cls: {tf.shape(my_cls)}')
+        tf.print(f'scores: {tf.shape(scores)}')
+        tf.print(f'bbox: {tf.shape(bbox)}')
+        tf.print(f'masks: {tf.shape(masks)}')
 
-    gt_bbox = labels['bbox'].numpy()
-    gt_cls = labels['classes'].numpy()
-    num_obj = labels['num_obj'].numpy()
+        my_cls, scores, bbox, masks = my_cls.numpy(), scores.numpy(), bbox.numpy(), masks.numpy()
+        image = denormalize_image(image)
+        
+        image = tf.squeeze(image).numpy()
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        cv2.imwrite('origin.png', image)
 
-    # show ground truth
-    for idx in range(num_obj[0]):
-        b = gt_bbox[0][idx]
-        cv2.rectangle(image, (b[1], b[0]), (b[3], b[2]), (0, 0, 255), 2)
+        gt_bbox = labels['bbox'].numpy()
+        gt_cls = labels['classes'].numpy()
+        num_obj = labels['num_obj'].numpy()
 
-        remapping = [
-            'Background',
-            'Face',
-            'Body',
-            'Bicycle',
-            'Car',
-            'Motorbike',
-            'Airplane',
-            'Ship',
-            'Bird',
-            'Cat',
-            'Dog',
-            'Horse',
-            'Cow'
-        ]
+        # show ground truth
+        for idx in range(num_obj[0]):
+            b = gt_bbox[0][idx]
+            cv2.rectangle(image, (b[1], b[0]), (b[3], b[2]), (0, 0, 255), 2)
 
-        print(remapping[gt_cls[0][idx]])
-        cv2.putText(image, remapping[gt_cls[0][idx]], (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.3, (0, 0, 255), 1)
+            remapping = [
+                'Background',
+                'Face',
+                'Body',
+                'Bicycle',
+                'Car',
+                'Motorbike',
+                'Airplane',
+                'Ship',
+                'Bird',
+                'Cat',
+                'Dog',
+                'Horse',
+                'Cow'
+            ]
 
-    print('---------------------')
-    # show the prediction box
-    for idx in range(bbox.shape[0]):
-        b = bbox[idx]
-        score = scores[idx]
-        cv2.rectangle(image, (b[1], b[0]), (b[3], b[2]), (255, 0, 0), 2)
+            print(remapping[gt_cls[0][idx]])
+            cv2.putText(image, remapping[gt_cls[0][idx]], (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.3, (0, 0, 255), 1)
 
-        remapping = [
-            'Background',
-            'Face',
-            'Body',
-            'Bicycle',
-            'Car',
-            'Motorbike',
-            'Airplane',
-            'Ship',
-            'Bird',
-            'Cat',
-            'Dog',
-            'Horse',
-            'Cow'
-        ]
+        print('---------------------')
+        # show the prediction box
+        for idx in range(bbox.shape[0]):
+            b = bbox[idx]
+            score = scores[idx]
+            cv2.rectangle(image, (b[1], b[0]), (b[3], b[2]), (255, 0, 0), 2)
+
+            remapping = [
+                'Background',
+                'Face',
+                'Body',
+                'Bicycle',
+                'Car',
+                'Motorbike',
+                'Airplane',
+                'Ship',
+                'Bird',
+                'Cat',
+                'Dog',
+                'Horse',
+                'Cow'
+            ]
 
 
-        print(remapping[my_cls[idx]+1])
-        cv2.putText(image, f'{remapping[my_cls[idx]+1]} {score: .3f}', (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 0, 0), 1)
+            print(remapping[my_cls[idx]+1])
+            cv2.putText(image, f'{remapping[my_cls[idx]+1]} {score: .3f}', (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 0, 0), 1)
 
-    cv2.imwrite('result.png', image)
+        cv2.imwrite('result.png', image)
 
-    # show the mask
-    seg = np.zeros([256, 256, masks.shape[0]])
+        # show the mask
+        seg = np.zeros([256, 256, masks.shape[0]])
 
-    for idx in range(masks.shape[0]):
-        mask = masks[idx].astype(np.uint8)
-        mask[mask > 0] = my_cls[idx]+1
-        seg[:, :, idx] = mask
+        for idx in range(masks.shape[0]):
+            mask = masks[idx].astype(np.uint8)
+            mask[mask > 0] = my_cls[idx]+1
+            seg[:, :, idx] = mask
 
-    seg = seg / 13 * 255
-    seg = np.amax(seg, axis=-1)
-    seg = seg.astype(np.uint8)
-    seg = 255 - seg
-    cv2.imwrite('seg.png', seg)
+        seg = seg / 13 * 255
+        seg = np.amax(seg, axis=-1)
+        seg = seg.astype(np.uint8)
+        seg = 255 - seg
+        cv2.imwrite('seg.png', seg)
+    else:
+        image = denormalize_image(image)
+        image = tf.squeeze(image).numpy()
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        cv2.imwrite('none.png', image)
+        print('None of object is detected.')
