@@ -18,7 +18,7 @@ class TFLiteExporter():
 
     def export(self, filename):
         inputs = tf.keras.Input(shape=self.input_shape)
-        _, protonet_out, cls_result, offset_result, mask_result = self.model(inputs)
+        _, protonet_out, cls_result, offset_result, mask_result = self.model(inputs, training=False)
 
         wrapper = tf.keras.Model(inputs, [protonet_out, cls_result, offset_result, mask_result])
         converter = tf.lite.TFLiteConverter.from_keras_model(wrapper)
