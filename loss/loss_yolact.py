@@ -163,8 +163,8 @@ class YOLACTLoss(object):
 
         # calculate num_pos
         loc_loss = self._loss_location(pred_offset, box_targets, positiveness) * self._loss_weight_box
-        # conf_loss = self._loss_class(pred_cls, cls_targets, num_classes, positiveness) * self._loss_weight_cls
-        conf_loss = self._focal_conf_objectness_loss(pred_cls, cls_targets, num_classes) * self._loss_weight_cls
+        conf_loss = self._loss_class(pred_cls, cls_targets, num_classes, positiveness) * self._loss_weight_cls
+        # conf_loss = self._focal_conf_objectness_loss(pred_cls, cls_targets, num_classes) * self._loss_weight_cls
         #conf_loss = self._focal_loss(pred_cls, cls_targets, num_classes) * self._loss_weight_cls
         mask_loss = self._loss_mask(proto_out, pred_mask_coef, bbox_norm, masks, positiveness, max_id_for_anchors,
                                     max_masks_for_train=100) * self._loss_weight_mask
