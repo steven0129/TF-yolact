@@ -18,4 +18,5 @@ label_id_total = []
 for data in tqdm(collection.find({'subset': 'val'})):
     label_id_total.extend(data['label_id'])
 
-print(obj_count_in_single_img)
+
+print(Counter(label_id_total))
