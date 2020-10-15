@@ -46,6 +46,12 @@ class Detect(object):
         tf.print("num batch:", num_batch)
         tf.print("num anchors:", num_anchors)
 
+        # apply softmax to pred_cls	
+        cls_pred = tf.nn.softmax(cls_pred, axis=-1)	
+        tf.print("score", tf.shape(cls_pred))	
+        cls_pred = tf.transpose(cls_pred, perm=[0, 2, 1])	
+        tf.print("score", tf.shape(cls_pred))
+
         for batch_idx in tf.range(num_batch):
             # add offset to anchors
             decoded_boxes = utils.map_to_bbox(self.anchors, loc_pred[batch_idx])
@@ -59,11 +65,7 @@ class Detect(object):
 
     def _detection(self, batch_idx, cls_pred, decoded_boxes, mask_pred):
         tf.print(f'cls_pred: {tf.shape(cls_pred)}')
-        objectness = tf.math.sigmoid(cls_pred[batch_idx, :, 0])
-        tf.print( 'objectness:', tf.boolean_mask(objectness, objectness > 0.5) )
-        classification = tf.nn.softmax(cls_pred[batch_idx, :, 1:], axis=-1)
-
-        cur_score = tf.transpose( tf.reshape(objectness, [-1, 1]) * classification , perm=[1, 0])
+        cur_score = cls_pred[batch_idx, 1:, :]
         tf.print("cur score:", tf.shape(cur_score))
         conf_score = tf.math.reduce_max(cur_score, axis=0)
         conf_score_id = tf.argmax(cur_score, axis=0)
@@ -213,7 +215,7 @@ print("Restore Ckpt Sucessfully!!")
 # Need default anchor
 anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
 valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
-                                                tfrecord_dir='data/obj_tfrecord_256x256_20200921',
+                                                tfrecord_dir='data/obj_tfrecord_256x256_20200930',
                                                 batch_size=1,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
