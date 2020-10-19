@@ -41,8 +41,8 @@ class Detect(object):
         num_anchors = tf.shape(loc_pred)[1]
 
         # apply softmax to pred_cls
-        cls_pred = tf.nn.softmax(cls_pred, axis=-1)
-        cls_pred = tf.transpose(cls_pred, perm=[0, 2, 1])
+        # cls_pred = tf.nn.softmax(cls_pred, axis=-1)
+        # cls_pred = tf.transpose(cls_pred, perm=[0, 2, 1])
 
         for batch_idx in tf.range(num_batch):
             # add offset to anchors
@@ -56,8 +56,12 @@ class Detect(object):
         return out
 
     def _detection(self, batch_idx, cls_pred, decoded_boxes, mask_pred):
-        # we don't need to deal with background label
-        cur_score = cls_pred[batch_idx, 1:, :]
+        # tf.print(f'cls_pred: {tf.shape(cls_pred)}')
+        objectness = tf.math.sigmoid(cls_pred[batch_idx, :, 0])
+        # tf.print( 'objectness:', tf.boolean_mask(objectness, objectness > 0.5) )
+        classification = tf.nn.softmax(cls_pred[batch_idx, :, 1:], axis=-1)
+
+        cur_score = tf.transpose( tf.reshape(objectness, [-1, 1]) * classification , perm=[1, 0])
         conf_score = tf.math.reduce_max(cur_score, axis=0)
         conf_score_id = tf.argmax(cur_score, axis=0)
         # tf.print(tf.math.bincount(conf_score_id, dtype=tf.dtypes.int64))
@@ -151,7 +155,7 @@ YOLACT = lite.MyYolact(input_size=256,
 
 model = YOLACT.gen()
 
-ckpt_dir = "checkpoints-SGD"
+ckpt_dir = "checkpoints-SGD-focal"
 latest = tf.train.latest_checkpoint(ckpt_dir)
 
 checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
@@ -163,7 +167,7 @@ print("Restore Ckpt Sucessfully!!")
 # Need default anchor
 anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
 valid_dataset = dataset_coco.prepare_evalloader(img_size=256,
-                                                tfrecord_dir='data/obj_tfrecord_256x256_20200921',
+                                                tfrecord_dir='data/obj_tfrecord_256x256_20200930',
                                                 subset='val')
 anchors = anchorobj.get_anchors()
 detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.3, nms_threshold=0.5, anchors=anchors)
