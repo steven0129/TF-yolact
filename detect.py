@@ -251,6 +251,7 @@ for image, labels in valid_dataset.take(1):
         num_obj = labels['num_obj'].numpy()
 
         # show ground truth
+        print('===============Label=============')
         for idx in range(num_obj[0]):
             b = gt_bbox[0][idx]
             cv2.rectangle(image, (b[1], b[0]), (b[3], b[2]), (0, 0, 255), 2)
@@ -275,8 +276,9 @@ for image, labels in valid_dataset.take(1):
             cv2.putText(image, remapping[gt_cls[0][idx]], (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_SIMPLEX,
                         0.3, (0, 0, 255), 1)
 
-        print('---------------------')
         # show the prediction box
+        print()
+        print('===============Prediction=============')
         for idx in range(bbox.shape[0]):
             b = bbox[idx]
             score = scores[idx]
@@ -321,5 +323,37 @@ for image, labels in valid_dataset.take(1):
         image = denormalize_image(image)
         image = tf.squeeze(image).numpy()
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        gt_bbox = labels['bbox'].numpy()
+        gt_cls = labels['classes'].numpy()
+        num_obj = labels['num_obj'].numpy()
+
+        # show ground truth
+        print('===============Label=============')
+        for idx in range(num_obj[0]):
+            b = gt_bbox[0][idx]
+            cv2.rectangle(image, (b[1], b[0]), (b[3], b[2]), (0, 0, 255), 2)
+
+            remapping = [
+                'Background',
+                'Face',
+                'Body',
+                'Bicycle',
+                'Car',
+                'Motorbike',
+                'Airplane',
+                'Ship',
+                'Bird',
+                'Cat',
+                'Dog',
+                'Horse',
+                'Cow'
+            ]
+            print(remapping[gt_cls[0][idx]])
+            cv2.putText(image, remapping[gt_cls[0][idx]], (int(b[1]), int(b[0]) - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.3, (0, 0, 255), 1)
+        
+        print()
+        print('===============Prediction===========')
         cv2.imwrite('none.png', image)
         print('None of object is detected.')
