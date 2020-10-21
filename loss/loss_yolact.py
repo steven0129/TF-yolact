@@ -132,9 +132,7 @@ class YOLACTLoss(object):
         self._loss_weight_seg = loss_seg
         self._neg_pos_ratio = neg_pos_ratio
         self._max_masks_for_train = max_masks_for_train
-        self.focal_loss_alpha = 0.25
-        self.focal_loss_gamma = 2
-        self.focal_loss_with_logits = tfa.losses.SigmoidFocalCrossEntropy(from_logits=True)
+        self.focal_loss_with_logits = tfa.losses.SigmoidFocalCrossEntropy(from_logits=True, gamma=10)
 
     def __call__(self, pred, label, num_classes):
         """
