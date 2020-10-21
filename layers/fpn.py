@@ -18,7 +18,7 @@ class DwConv(tf.keras.layers.Layer):
             (1, 1),
             padding='same',
             use_bias=False,
-            strides=1,
+            strides=1
         )
 
         self.conv_bn_pw = tf.keras.layers.BatchNormalization(axis=-1)
@@ -77,8 +77,9 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
             num_fpn_filters
     """
 
-    def __init__(self, num_fpn_filters):
+    def __init__(self, num_fpn_filters, bidirectional=False):
         super(FeaturePyramidNeck, self).__init__()
+        self.bidirectional = bidirectional
         self.upSample = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')
 
         # no Relu for downsample layer
@@ -86,6 +87,15 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
                                                   kernel_initializer=tf.keras.initializers.glorot_uniform())
 
         self.downSample2 = tf.keras.layers.Conv2D(num_fpn_filters, (3, 3), 2, padding="same",
+                                                  kernel_initializer=tf.keras.initializers.glorot_uniform())
+
+        self.downSample3 = tf.keras.layers.Conv2D(num_fpn_filters, (3, 3), 2, padding="same",
+                                                  kernel_initializer=tf.keras.initializers.glorot_uniform())
+
+        self.downSample4 = tf.keras.layers.Conv2D(num_fpn_filters, (3, 3), 2, padding="same",
+                                                  kernel_initializer=tf.keras.initializers.glorot_uniform())
+
+        self.downSample5 = tf.keras.layers.Conv2D(num_fpn_filters, (3, 3), 2, padding="same",
                                                   kernel_initializer=tf.keras.initializers.glorot_uniform())
 
         self.lateralCov1 = tf.keras.layers.Conv2D(num_fpn_filters, (1, 1), 1, padding="same",
@@ -111,25 +121,45 @@ class FeaturePyramidNeck(tf.keras.layers.Layer):
         self.fusion3 = FastNormalizedFusion()
 
     def call(self, c3, c4, c5, c6, c7):
-        # lateral conv for c3 c4 c5
-        p7 = self.lateralCov1(c7)
-        p6 = self._crop_and_add(self.upSample(p7), self.lateralCov2(c6))
-        p5 = self._crop_and_add(self.upSample(p6), self.lateralCov3(c5))
-        p4 = self._crop_and_add(self.upSample(p5), self.lateralCov4(c4))
-        p3 = self._crop_and_add(self.upSample(p4), self.lateralCov5(c3))
+        if self.bidirectional == False:
+            # lateral conv for c3 c4 c5
+            p7 = self.lateralCov1(c7)
+            p6 = self._crop_and_add(self.upSample(p7), self.lateralCov2(c6))
+            p5 = self._crop_and_add(self.upSample(p6), self.lateralCov3(c5))
+            p4 = self._crop_and_add(self.upSample(p5), self.lateralCov4(c4))
+            p3 = self._crop_and_add(self.upSample(p4), self.lateralCov5(c3))
 
-        # smooth pred layer for p3, p4, p5
-        # p3 = self.predictP3(p3)
-        # p4 = self.predictP4(p4)
-        # p5 = self.predictP5(p5)
-        # p6 = self.predictP6(p6)
-        # p7 = self.predictP7(p7)
+            # smooth pred layer for p3, p4, p5
+            # p3 = self.predictP3(p3)
+            # p4 = self.predictP4(p4)
+            # p5 = self.predictP5(p5)
+            # p6 = self.predictP6(p6)
+            # p7 = self.predictP7(p7)
 
-        # downsample conv to get p6, p7
-        # p6 = self.downSample1(p5)
-        # p7 = self.downSample2(p6)
+            # downsample conv to get p6, p7
+            # p6 = self.downSample1(p5)
+            # p7 = self.downSample2(p6)
 
-        return [p3, p4, p5, p6, p7]
+            return [p3, p4, p5, p6, p7]
+
+        else:
+            in7 = self.lateralCov1(c7)
+            in6 = self.lateralCov2(c6)
+            in5 = self.lateralCov3(c5)
+            in4 = self.lateralCov4(c4)
+            in3 = self.lateralCov5(c3)
+
+            p6_1 = self._crop_and_add(self.upSample(in7), in6)
+            p5_1 = self._crop_and_add(self.upSample(p6_1), in5)
+            p4_1 = self._crop_and_add(self.upSample(p5_1), in4)
+
+            p3_2 = self._crop_and_add(self.upSample(p4_1), in3)
+            p4_2 = self._crop_and_add(in4, self._crop_and_add(self.downSample1(p3_2), p4_1))
+            p5_2 = self._crop_and_add(in5, self._crop_and_add(self.downSample2(p4_2), p5_1))
+            p6_2 = self._crop_and_add(in6, self._crop_and_add(self.downSample3(p5_2), p6_1))
+            p7_2 = self._crop_and_add(self.downSample4(p6_2), in7)
+
+            return [p3_2, p4_2, p5_2, p6_2, p7_2]
 
     def _crop_and_add(self, x1, x2):
         """

@@ -24,7 +24,7 @@ class MyYolact():
         self.backbone_pretrained.trainable = True
 
         # extract certain feature maps for FPN
-        self.backbone_fpn = FeaturePyramidNeck(fpn_channels)
+        self.backbone_fpn = FeaturePyramidNeck(fpn_channels, bidirectional=True)
         self.protonet = ProtoNet(num_mask)
 
         # semantic segmentation branch to boost feature richness
