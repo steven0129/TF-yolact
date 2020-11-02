@@ -6,6 +6,7 @@ import numpy as np
 import PIL
 import gridfs
 
+from utils import learning_rate_schedule
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from tqdm import tqdm
@@ -14,13 +15,16 @@ class TFLiteExporter():
     def __init__(self, model, input_size=256):
         self.model = model
         self.input_shape = (input_size, input_size, 3)
-        self.softmax = tf.keras.layers.Softmax()
+        self.softmax = tf.keras.layers.Softmax(axis=-1)
 
     def export(self, filename):
         inputs = tf.keras.Input(shape=self.input_shape)
         _, protonet_out, cls_result, offset_result, mask_result = self.model(inputs, training=False)
+        cls_prob = self.softmax(cls_result)
+        background_prob = cls_prob[:, :, 0]
+        foreground_prob = cls_prob[:, :, 1:]
 
-        wrapper = tf.keras.Model(inputs, [protonet_out, cls_result, offset_result, mask_result])
+        wrapper = tf.keras.Model(inputs, [protonet_out, background_prob, foreground_prob, offset_result, mask_result])
         converter = tf.lite.TFLiteConverter.from_keras_model(wrapper)
         converter.experimental_new_converter=False
         tflite_model = converter.convert()
@@ -151,8 +155,23 @@ class MongoExporter():
     
 
 if __name__ == '__main__':
-    exporter = MongoExporter('data/obj_tfrecord_256x256_20200930', 'obj_256x256_20200930', subset='val')
-    exporter.export()
-    
-    exporter = MongoExporter('data/obj_tfrecord_256x256_20200930', 'obj_256x256_20200930', subset='train')
-    exporter.export()
+    YOLACT = lite.MyYolact(input_size=256,
+               fpn_channels=96,
+               feature_map_size=[32, 16, 8, 4, 2],
+               num_class=13,
+               num_mask=32,
+               aspect_ratio=[1, 0.5, 2],
+               scales=[24, 48, 96, 192, 384])
+
+    model = YOLACT.gen()
+
+    lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=1e-3)
+    optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=0.9)
+
+    ckpt_dir = 'checkpoints-SGD'
+    latest = tf.train.latest_checkpoint(ckpt_dir)
+    checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
+    checkpoint.restore(tf.train.latest_checkpoint(ckpt_dir))
+
+    exporter = TFLiteExporter(model)
+    exporter.export('yolact-20201027.tflite')
