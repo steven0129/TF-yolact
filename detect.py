@@ -315,9 +315,12 @@ for image, labels in valid_dataset.take(1):
             mask[mask > 0] = my_cls[idx]+1
             seg[:, :, idx] = mask
 
-        seg = seg / 13 * 255
+        
         seg = np.amax(seg, axis=-1)
         seg = seg.astype(np.uint8)
+        cv2.imwrite('seg-real.png', seg)
+        
+        seg = seg / 13 * 255
         seg = 255 - seg
         cv2.imwrite('seg.png', seg)
     else:
