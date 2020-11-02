@@ -151,6 +151,7 @@ class Parser(object):
         masks = data['gt_masks']
         image_height = data['height']
         image_width = data['width']
+        filename = data['filename']
 
         # Skips annotations with `is_crowd` = True.
         # Todo: Need to understand control_dependeicies and tf.gather
@@ -225,7 +226,8 @@ class Parser(object):
             'classes': classes,
             'num_obj': num_obj,
             'mask_target': masks,
-            'max_id_for_anchors': max_id_for_anchors
+            'max_id_for_anchors': max_id_for_anchors,
+            'filename': filename
         }
         return image, labels
 

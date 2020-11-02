@@ -223,6 +223,7 @@ tf.print(tf.shape(anchors))
 detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.3, nms_threshold=0.5, anchors=anchors)
 
 for image, labels in valid_dataset.take(1):
+    tf.print( 'File Name:', labels['filename'] )
     tf.print( 'classes', tf.boolean_mask(labels['classes'], labels['classes'] > 0) )
     # only try on 1 image
     output = model(image, training=False)

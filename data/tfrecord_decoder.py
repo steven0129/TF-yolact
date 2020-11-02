@@ -8,6 +8,7 @@ class TfExampleDecoder(object):
     def __init__(self):
         self._keys_to_features = {
             'image/source_id': tf.io.FixedLenFeature([], dtype=tf.string),
+            'image/filename': tf.io.FixedLenFeature([], dtype=tf.string),
             'image/height': tf.io.FixedLenFeature([], dtype=tf.int64),
             'image/width': tf.io.FixedLenFeature([], dtype=tf.int64),
             'image/encoded': tf.io.FixedLenFeature([], dtype=tf.string),
@@ -79,6 +80,7 @@ class TfExampleDecoder(object):
 
         decoded_tensors = {
             'image': image,
+            'filename': parsed_tensors['image/filename'],
             'height': parsed_tensors['image/height'],
             'width': parsed_tensors['image/width'],
             'gt_classes': parsed_tensors['image/object/class/label_id'],
