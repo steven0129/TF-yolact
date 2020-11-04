@@ -35,6 +35,9 @@ class MongoExporter():
     def __init__(self, tfrecord_dir, col_name, subset='train'):
         self.tfrecord_dir = tfrecord_dir
         self.keys2features = {
+            'image/filename': tf.io.FixedLenFeature([], dtype=tf.string),
+            'image/fullpath': tf.io.FixedLenFeature([], dtype=tf.string),
+            'image/dataset': tf.io.FixedLenFeature([], dtype=tf.string),
             'image/source_id': tf.io.FixedLenFeature([], dtype=tf.string),
             'image/height': tf.io.FixedLenFeature([], dtype=tf.int64),
             'image/width': tf.io.FixedLenFeature([], dtype=tf.int64),
@@ -95,6 +98,9 @@ class MongoExporter():
                 masks_id.append(objID)
 
             self.collection.insert_one({
+                'filename': data['image/filename'].numpy().decode('utf-8'),
+                'fullpath': data['image/fullpath'].numpy().decode('utf-8'),
+                'dataset': data['image/dataset'].numpy().decode('utf-8'),
                 'image': img_id,
                 'masks': masks_id,
                 'height': height,
@@ -153,8 +159,7 @@ class MongoExporter():
         
         return image
     
-
-if __name__ == '__main__':
+def export_tflite():
     YOLACT = lite.MyYolact(input_size=256,
                fpn_channels=96,
                feature_map_size=[32, 16, 8, 4, 2],
@@ -175,3 +180,13 @@ if __name__ == '__main__':
 
     exporter = TFLiteExporter(model)
     exporter.export('yolact-20201027.tflite')
+
+def export_mongo():
+    exporter = MongoExporter('data/obj_tfrecord_256x256_20201102', 'obj_256x256_20201102', subset='val')
+    exporter.export()
+
+    exporter = MongoExporter('data/obj_tfrecord_256x256_20201102', 'obj_256x256_20201102', subset='train')
+    exporter.export()
+
+if __name__ == '__main__':
+    export_mongo()    
