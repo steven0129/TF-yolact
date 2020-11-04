@@ -112,82 +112,6 @@ class Detect(object):
 
         return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
 
-    def _fast_nms(self, boxes, masks, scores, iou_threshold=0.5, top_k=200, second_threshold=False):
-        scores, idx = tf.math.top_k(scores, k=top_k)
-        tf.print("top k scores:", tf.shape(scores))
-        tf.print("top k indices", tf.shape(idx))
-        tf.print(idx[:20])
-
-        num_classes, num_dets = tf.shape(idx)[0], tf.shape(idx)[1]
-        tf.print("num_classes:", num_classes)
-        tf.print("num dets:", num_dets)
-
-        tf.print("old boxes", tf.shape(boxes))
-
-        boxes = tf.gather(boxes, idx)
-        tf.print("new boxes", tf.shape(boxes))
-
-        masks = tf.gather(masks, idx)
-        tf.print("new masks", tf.shape(masks))
-
-        iou = utils.jaccard(boxes, boxes)
-        tf.print("iou", tf.shape(iou))
-
-        # upper trangular matrix - diagnoal
-        upper_triangular = tf.linalg.band_part(iou, 0, -1)
-        diag = tf.linalg.band_part(iou, 0, 0)
-        tf.print("upper tri", upper_triangular[0])
-        iou = upper_triangular - diag
-        tf.print("iou", tf.shape(iou))
-        tf.print("iou", iou[0])
-
-        # fitler out the unwanted ROI
-        iou_max = tf.reduce_max(iou, axis=1)
-        tf.print("iou max", tf.shape(iou_max))
-        tf.print("iou max", iou_max)
-
-        idx_det = tf.where(iou_max < iou_threshold)
-
-        tf.print("idx det", tf.shape(idx_det))
-        tf.print(idx_det)
-
-        classes = tf.broadcast_to(tf.expand_dims(tf.range(num_classes), axis=-1), tf.shape(iou_max))
-        tf.print("classes", classes)
-        classes = tf.gather_nd(classes, idx_det)
-        tf.print("new_classes", tf.shape(classes))
-        tf.print(classes)
-        boxes = tf.gather_nd(boxes, idx_det)
-        tf.print("new_boxes", tf.shape(boxes))
-        masks = tf.gather_nd(masks, idx_det)
-        tf.print("new_masks", tf.shape(masks))
-        scores = tf.gather_nd(scores, idx_det)
-        tf.print("new_scores", tf.shape(scores))
-        tf.print(scores)
-
-        max_num_detection = tf.math.minimum(self.top_k, tf.size(scores))
-        # number of max detection = 100 (u can choose whatever u want)
-        scores, idx = tf.math.top_k(scores, k=max_num_detection)
-        tf.print("max num score", scores)
-        classes = tf.gather(classes, idx)
-        tf.print("max num classes", classes)
-        boxes = tf.gather(boxes, idx)
-        masks = tf.gather(masks, idx)
-        scores = tf.gather(scores, idx)
-
-        # Todo Handle the situation that only 1 or 0 detection
-        # second threshold
-        positive_det = tf.squeeze(tf.where(scores > self.conf_threshold))
-        scores = tf.gather(scores, positive_det)
-        classes = classes[:tf.size(scores)]
-        tf.print("final classes", classes)
-        boxes = boxes[:tf.size(scores)]
-        masks = masks[:tf.size(scores)]
-
-        tf.print("final score", scores)
-        tf.print("num_final_detection", tf.size(scores))
-
-        return boxes, masks, classes, scores
-
 lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=1e-3)
 optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=0.9)
 
@@ -218,7 +142,7 @@ valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
 tf.print(tf.shape(anchors))
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.3, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.4, nms_threshold=0.5, anchors=anchors)
 
 for image, labels in valid_dataset.take(1):
     tf.print( 'classes', tf.boolean_mask(labels['classes'], labels['classes'] > 0) )
