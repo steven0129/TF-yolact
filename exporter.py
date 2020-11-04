@@ -16,14 +16,16 @@ class TFLiteExporter():
         self.model = model
         self.input_shape = (input_size, input_size, 3)
         self.softmax = tf.keras.layers.Softmax(axis=-1)
+        self.reshape = tf.keras.layers.Reshape((-1, 1))
 
     def export(self, filename):
         inputs = tf.keras.Input(shape=self.input_shape)
         _, protonet_out, cls_result, offset_result, mask_result = self.model(inputs)
-        background_logits = cls_result[:, :, 0]
-        classes_prob = self.softmax(cls_result[:, :, 1:])
+        objectness = tf.math.sigmoid(cls_result[:, :, 0])
+        objectness = self.reshape(objectness)
+        classes_prob = tf.nn.softmax(cls_result[:, :, 1:], axis=-1)
 
-        wrapper = tf.keras.Model(inputs, [protonet_out, background_logits, classes_prob, offset_result, mask_result])
+        wrapper = tf.keras.Model(inputs, [protonet_out, objectness * classes_prob, offset_result, mask_result])
         converter = tf.lite.TFLiteConverter.from_keras_model(wrapper)
         converter.experimental_new_converter=False
         tflite_model = converter.convert()
@@ -167,10 +169,10 @@ if __name__ == '__main__':
     lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=1e-3)
     optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=0.9)
 
-    ckpt_dir = 'checkpoints-SGD-20201019'
+    ckpt_dir = 'checkpoints-SGD'
     latest = tf.train.latest_checkpoint(ckpt_dir)
     checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
     checkpoint.restore(tf.train.latest_checkpoint(ckpt_dir))
 
     exporter = TFLiteExporter(model)
-    exporter.export('yolact-20201021.tflite')
+    exporter.export('yolact.tflite')
