@@ -8,10 +8,7 @@ data/coco/
 data/DensePose/
 data/__init__.pyc
 data/coco_tfrecord_256x256_20200903/
-data/obj_tfrecord_256x256_20200914/
-data/obj_tfrecord_256x256_20200916/
-data/obj_tfrecord_256x256_20200921/
-data/obj_tfrecord_256x256_20200930/
+data/obj_tfrecord_256x256_*/
 data/openimages-20200921/
 data/openimages-20200928/
 data/scene-parse-ins/
