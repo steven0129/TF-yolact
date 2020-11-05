@@ -2,6 +2,7 @@ import tensorflow as tf
 import time
 import tensorflow_addons as tfa
 from utils import utils
+from data import anchor
 
 class GHM_Loss():
     def __init__(self, bins=10, momentum=0.75):
@@ -133,6 +134,8 @@ class YOLACTLoss(object):
         self._neg_pos_ratio = neg_pos_ratio
         self._max_masks_for_train = max_masks_for_train
         self.focal_loss_with_logits = tfa.losses.SigmoidFocalCrossEntropy(from_logits=True, gamma=10)
+        self.giou_loss = tfa.losses.GIoULoss(reduction=tf.keras.losses.Reduction.NONE)
+        self.anchors = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
 
     def __call__(self, pred, label, num_classes):
         """
@@ -154,18 +157,18 @@ class YOLACTLoss(object):
         box_targets = label['box_targets']
         positiveness = label['positiveness']
         bbox_norm = label['bbox_for_norm']
+        gt_bbox = label['bbox']
         masks = label['mask_target']
         max_id_for_anchors = label['max_id_for_anchors']
         classes = label['classes']
         num_obj = label['num_obj']
 
-        # calculate num_pos
-        loc_loss = self._loss_location(pred_offset, box_targets, positiveness) * self._loss_weight_box
+        # loc_loss = self._loss_location(pred_offset, box_targets, positiveness) * self._loss_weight_box
+        loc_loss = self._loss_giou_location(pred_offset, gt_bbox, positiveness) * self._loss_weight_box
+
         # conf_loss = self._loss_class(pred_cls, cls_targets, num_classes, positiveness) * self._loss_weight_cls
         conf_loss = self._focal_conf_objectness_loss(pred_cls, cls_targets, num_classes) * self._loss_weight_cls
-        #conf_loss = self._focal_loss(pred_cls, cls_targets, num_classes) * self._loss_weight_cls
-        mask_loss = self._loss_mask(proto_out, pred_mask_coef, bbox_norm, masks, positiveness, max_id_for_anchors,
-                                    max_masks_for_train=100) * self._loss_weight_mask
+        mask_loss = self._loss_mask(proto_out, pred_mask_coef, bbox_norm, masks, positiveness, max_id_for_anchors, max_masks_for_train=100) * self._loss_weight_mask
         seg_loss = self._loss_semantic_segmentation(seg, masks, classes, num_obj) * self._loss_weight_seg
         total_loss = loc_loss + conf_loss + mask_loss + seg_loss
 
@@ -186,6 +189,45 @@ class YOLACTLoss(object):
         loss_loc = tf.reduce_sum(smoothl1loss(gt_offset, pred_offset)) / tf.cast(num_pos, tf.float32)
 
         return loss_loc
+
+    def _loss_giou_location(self, pred_offset, gt_bbox, positiveness):
+        variances = [0.1, 0.2]
+        positiveness = tf.expand_dims(positiveness, axis=-1)
+        num_batch = tf.shape(gt_bbox)[0]
+
+        # map to bbox
+        anchors = tf.expand_dims(self.anchors.get_anchors(), axis=0)
+        anchors = tf.tile(anchors, [num_batch, 1, 1])
+
+        anchors_h = anchors[:, :, 2] - anchors[:, :, 0]
+        anchors_w = anchors[:, :, 3] - anchors[:, :, 1]
+        anchors_cx = anchors[:, :, 1] + (anchors_w / 2)
+        anchors_cy = anchors[:, :, 0] + (anchors_h / 2)
+
+        preds_cx, preds_cy, preds_w, preds_h = tf.unstack(pred_offset, axis=-1)
+        
+        news_cx = preds_cx * (anchors_w * variances[0]) + anchors_cx
+        news_cy = preds_cy * (anchors_h * variances[0]) + anchors_cy
+        news_w = tf.math.exp(preds_w * variances[1]) * anchors_w
+        news_h = tf.math.exp(preds_h * variances[1]) * anchors_h
+
+        ymins = news_cx - (news_h / 2)
+        xmins = news_cx - (news_w / 2)
+        ymaxs = news_cy + (news_h / 2)
+        xmaxs = news_cx + (news_w / 2)
+
+        pred_bboxes = tf.stack([ymins, xmins, ymaxs, xmaxs], axis=-1)
+
+        # get positive indices
+        pos_indices = tf.where(positiveness == 1)
+        pred_bboxes = tf.gather_nd(pred_bboxes, pos_indices[:, :-1])
+        gt_bbox = tf.gather_nd(gt_bbox, pos_indices[:, :-1])
+
+        # GIoU loss
+        num_pos = tf.shape(gt_bbox)[0]
+        loss = tf.reduce_sum(self.giou_loss(gt_bbox, pred_bboxes)) / tf.cast(num_pos, tf.float32)
+
+        return loss
 
     def _loss_class(self, pred_cls, gt_cls, num_cls, positiveness):
 
@@ -215,7 +257,6 @@ class YOLACTLoss(object):
 
         # apply softmax on the pred_cls
         # -log(softmax class 0)
-        # neg_minus_log_class0 = -1 * tf.math.log(neg_softmax[:, 0])
         neg_minus_log_class0 = -1 * tf.nn.log_softmax(neg_pred_cls)[:, 0]
 
         # sort of -log(softmax class 0)
