@@ -23,8 +23,8 @@ def prepare_dataloader(tfrecord_dir, batch_size, img_size, subset="train"):
 
     parser = yolact_parser.Parser(output_size=img_size,
                                   anchor_instance=anchorobj,
-                                  match_threshold=0.5,
-                                  unmatched_threshold=0.5,
+                                  match_threshold=0.7,
+                                  unmatched_threshold=0.3,
                                   proto_output_size=64,
                                   mode=subset)
     files = tf.io.matching_files(os.path.join(tfrecord_dir, "obj_%s.*" % subset))
