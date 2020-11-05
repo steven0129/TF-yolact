@@ -164,7 +164,7 @@ class YOLACTLoss(object):
         num_obj = label['num_obj']
 
         # loc_loss = self._loss_location(pred_offset, box_targets, positiveness) * self._loss_weight_box
-        loc_loss = self._loss_giou_location(pred_offset, gt_bbox, positiveness) * self._loss_weight_box
+        loc_loss = self._loss_giou_location(pred_offset, box_targets, positiveness) * self._loss_weight_box
 
         # conf_loss = self._loss_class(pred_cls, cls_targets, num_classes, positiveness) * self._loss_weight_cls
         conf_loss = self._focal_conf_objectness_loss(pred_cls, cls_targets, num_classes) * self._loss_weight_cls
@@ -190,12 +190,12 @@ class YOLACTLoss(object):
 
         return loss_loc
 
-    def _loss_giou_location(self, pred_offset, gt_bbox, positiveness):
+    def _loss_giou_location(self, pred_offset, gt_offset, positiveness):
         variances = [0.1, 0.2]
         positiveness = tf.expand_dims(positiveness, axis=-1)
-        num_batch = tf.shape(gt_bbox)[0]
+        num_batch = tf.shape(pred_offset)[0]
 
-        # map to bbox
+        # pred_offset map to bbox
         anchors = tf.expand_dims(self.anchors.get_anchors(), axis=0)
         anchors = tf.tile(anchors, [num_batch, 1, 1])
 
@@ -218,14 +218,37 @@ class YOLACTLoss(object):
 
         pred_bboxes = tf.stack([ymins, xmins, ymaxs, xmaxs], axis=-1)
 
+        # gt_offset map to bbox
+        anchors = tf.expand_dims(self.anchors.get_anchors(), axis=0)
+        anchors = tf.tile(anchors, [num_batch, 1, 1])
+
+        anchors_h = anchors[:, :, 2] - anchors[:, :, 0]
+        anchors_w = anchors[:, :, 3] - anchors[:, :, 1]
+        anchors_cx = anchors[:, :, 1] + (anchors_w / 2)
+        anchors_cy = anchors[:, :, 0] + (anchors_h / 2)
+
+        gt_cx, gt_cy, gt_w, gt_h = tf.unstack(gt_offset, axis=-1)
+        
+        news_cx = gt_cx * (anchors_w * variances[0]) + anchors_cx
+        news_cy = gt_cy * (anchors_h * variances[0]) + anchors_cy
+        news_w = tf.math.exp(gt_w * variances[1]) * anchors_w
+        news_h = tf.math.exp(gt_h * variances[1]) * anchors_h
+
+        ymins = news_cx - (news_h / 2)
+        xmins = news_cx - (news_w / 2)
+        ymaxs = news_cy + (news_h / 2)
+        xmaxs = news_cx + (news_w / 2)
+
+        gt_bboxes = tf.stack([ymins, xmins, ymaxs, xmaxs], axis=-1)
+
         # get positive indices
         pos_indices = tf.where(positiveness == 1)
         pred_bboxes = tf.gather_nd(pred_bboxes, pos_indices[:, :-1])
-        gt_bbox = tf.gather_nd(gt_bbox, pos_indices[:, :-1])
+        gt_bboxes = tf.gather_nd(gt_bboxes, pos_indices[:, :-1])
 
         # GIoU loss
-        num_pos = tf.shape(gt_bbox)[0]
-        loss = tf.reduce_sum(self.giou_loss(gt_bbox, pred_bboxes)) / tf.cast(num_pos, tf.float32)
+        num_pos = tf.shape(gt_bboxes)[0]
+        loss = tf.reduce_sum(self.giou_loss(gt_bboxes, pred_bboxes)) / tf.cast(num_pos, tf.float32)
 
         return loss
 
