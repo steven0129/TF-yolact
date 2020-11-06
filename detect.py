@@ -53,12 +53,14 @@ class Detect(object):
         objectness = tf.math.sigmoid(cls_pred[batch_idx, :, 0])
         classification = tf.nn.softmax(cls_pred[batch_idx, :, 1:], axis=-1)
 
-        cur_score = tf.transpose( tf.reshape(objectness, [-1, 1]) * classification , perm=[1, 0])
-        conf_score = tf.math.reduce_max(cur_score, axis=0)
-        conf_score_id = tf.argmax(cur_score, axis=0)
+        conf_score = tf.math.reduce_max(classification, axis=-1)
+        conf_score_id = tf.argmax(classification, axis=-1)
+        tf.print("conf_score:", tf.shape(conf_score))
+        tf.print(f'conf_score_id: {tf.math.bincount(tf.cast(conf_score_id, dtype=tf.int32))}')
 
         # filter out the ROI that have conf score > confidence threshold
-        candidate_ROI_idx = tf.squeeze(tf.where(conf_score > self.conf_threshold))
+        candidate_ROI_idx = tf.squeeze(tf.where(tf.logical_and(objectness > 0.5, conf_score > self.conf_threshold)))
+        tf.print("candidate_ROI", tf.shape(candidate_ROI_idx))
 
         if tf.size(candidate_ROI_idx) == 0:
             return None
