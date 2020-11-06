@@ -31,20 +31,12 @@ class Detect(object):
         }
 
         loc_pred = prediction['pred_offset']
-        tf.print('loc pred', tf.shape(loc_pred))
         cls_pred = prediction['pred_cls']
-        tf.print(tf.math.sigmoid(cls_pred[:, 0]))
-        tf.print('cls pred', tf.shape(cls_pred))
         mask_pred = prediction['pred_mask_coef']
-        tf.print('mask pred', tf.shape(mask_pred))
         proto_pred = prediction['proto_out']
-        tf.print('proto pred', tf.shape(proto_pred))
-        tf.print('anchors', tf.shape(self.anchors))
         out = []
         num_batch = tf.shape(loc_pred)[0]
         num_anchors = tf.shape(loc_pred)[1]
-        tf.print("num batch:", num_batch)
-        tf.print("num anchors:", num_anchors)
 
         for batch_idx in tf.range(num_batch):
             # add offset to anchors
@@ -58,22 +50,15 @@ class Detect(object):
         return out
 
     def _detection(self, batch_idx, cls_pred, decoded_boxes, mask_pred):
-        tf.print(f'cls_pred: {tf.shape(cls_pred)}')
         objectness = tf.math.sigmoid(cls_pred[batch_idx, :, 0])
-        tf.print( 'objectness:', tf.boolean_mask(objectness, objectness > 0.5) )
         classification = tf.nn.softmax(cls_pred[batch_idx, :, 1:], axis=-1)
 
         cur_score = tf.transpose( tf.reshape(objectness, [-1, 1]) * classification , perm=[1, 0])
-        tf.print("cur score:", tf.shape(cur_score))
         conf_score = tf.math.reduce_max(cur_score, axis=0)
         conf_score_id = tf.argmax(cur_score, axis=0)
-        tf.print("conf_score:", tf.shape(conf_score))
-        tf.print(f'conf_score_id: {tf.math.bincount(tf.cast(conf_score_id, dtype=tf.int32))}')
-        # tf.print(tf.math.bincount(conf_score_id, dtype=tf.dtypes.int64))
 
         # filter out the ROI that have conf score > confidence threshold
         candidate_ROI_idx = tf.squeeze(tf.where(conf_score > self.conf_threshold))
-        tf.print("candidate_ROI", tf.shape(candidate_ROI_idx))
 
         if tf.size(candidate_ROI_idx) == 0:
             return None
@@ -81,19 +66,14 @@ class Detect(object):
         # scores = tf.gather(cur_score, candidate_ROI_idx, axis=-1)
         scores = tf.gather(conf_score, candidate_ROI_idx)
         classes = tf.gather(conf_score_id, candidate_ROI_idx)
-        tf.print("scores", tf.shape(scores))
         boxes = tf.gather(decoded_boxes, candidate_ROI_idx)
-        tf.print("boxes", tf.shape(boxes))
         masks = tf.gather(mask_pred[batch_idx], candidate_ROI_idx)
-        tf.print("masks", tf.shape(masks))
 
         if tf.shape(tf.shape(boxes))[0] == 1:
             scores = tf.expand_dims(scores, axis=0)
             boxes = tf.expand_dims(boxes, axis=0)
             masks = tf.expand_dims(masks, axis=0)
             classes = tf.expand_dims(classes, axis=0)
-
-            print("final scores", scores)
 
             return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
         
@@ -103,12 +83,6 @@ class Detect(object):
         scores = tf.gather(scores, selected_indices)
         masks = tf.gather(masks, selected_indices)
         classes = tf.gather(classes, selected_indices)
-
-        print("final scores", scores)
-
-        # apply fast nms for final detection
-        # top_k = tf.math.minimum(self.top_k, tf.size(candidate_ROI_idx))
-        # boxes, masks, classes, scores = self._fast_nms(boxes, masks, scores, self.nms_threshold, top_k)
 
         return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
 
@@ -130,7 +104,6 @@ latest = tf.train.latest_checkpoint(ckpt_dir)
 
 checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
 status = checkpoint.restore(tf.train.latest_checkpoint(ckpt_dir))
-print("Restore Ckpt Sucessfully!!")
 
 # Load Validation Images and do Detection
 # -----------------------------------------------------------------------------------------------
@@ -141,7 +114,6 @@ valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
                                                 batch_size=1,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
-tf.print(tf.shape(anchors))
 detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.4, nms_threshold=0.5, anchors=anchors)
 
 for image, labels in valid_dataset.take(1):
@@ -149,15 +121,13 @@ for image, labels in valid_dataset.take(1):
     # only try on 1 image
     output = model(image, training=False)
     detection = detect_layer(output)
-    print(len(detection))
-
     dets = postprocess(detection, 256, 256, 0, 'bilinear')
 
     if dets != None:
         my_cls, scores, bbox, masks = dets
 
         tf.print(f'cls: {tf.shape(my_cls)}')
-        tf.print(f'scores: {tf.shape(scores)}')
+        tf.print(f'scores: {scores}')
         tf.print(f'bbox: {tf.shape(bbox)}')
         tf.print(f'masks: {tf.shape(masks)}')
 
