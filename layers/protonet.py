@@ -121,6 +121,8 @@ class PADModule(tf.keras.layers.Layer):
             use_bias=False
         )
 
+        self.output_relu = tf.keras.layers.ReLU()
+
         self.upSampling4x4 = tf.keras.layers.UpSampling2D(size=(4, 4), interpolation='bilinear')
         self.upSampling2x2 = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')
 
@@ -142,7 +144,6 @@ class PADModule(tf.keras.layers.Layer):
         feature_map = p3 + feature_map                  # [1/8, 1/8, 192]
         feature_map = self.upSampling2x2(feature_map)   # [1/4, 1/4, 192]
         prototypes = self.output_conv_1x1(feature_map)  # [1/4, 1/4, 96]
-
-        tf.print(tf.shape(prototypes))
+        prototypes = self.output_relu(prototypes)
 
         return prototypes
