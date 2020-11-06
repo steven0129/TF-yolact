@@ -16,16 +16,14 @@ class TFLiteExporter():
         self.model = model
         self.input_shape = (input_size, input_size, 3)
         self.softmax = tf.keras.layers.Softmax(axis=-1)
-        self.reshape = tf.keras.layers.Reshape((-1, 1))
 
     def export(self, filename):
         inputs = tf.keras.Input(shape=self.input_shape)
         _, protonet_out, cls_result, offset_result, mask_result = self.model(inputs)
         objectness = tf.math.sigmoid(cls_result[:, :, 0])
-        objectness = self.reshape(objectness)
         classes_prob = tf.nn.softmax(cls_result[:, :, 1:], axis=-1)
 
-        wrapper = tf.keras.Model(inputs, [protonet_out, objectness * classes_prob, offset_result, mask_result])
+        wrapper = tf.keras.Model(inputs, [protonet_out, objectness, classes_prob, offset_result, mask_result])
         converter = tf.lite.TFLiteConverter.from_keras_model(wrapper)
         converter.experimental_new_converter=False
         tflite_model = converter.convert()
