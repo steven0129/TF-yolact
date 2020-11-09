@@ -59,7 +59,10 @@ class Detect(object):
         tf.print(f'conf_score_id: {tf.math.bincount(tf.cast(conf_score_id, dtype=tf.int32))}')
 
         # filter out the ROI that have conf score > confidence threshold
-        candidate_ROI_idx = tf.squeeze(tf.where(tf.logical_and(objectness > 0.5, conf_score > self.conf_threshold)))
+        test_indices = tf.where(objectness > 0.45)
+        test_objectness = tf.gather(objectness, test_indices)
+        tf.print(test_objectness)
+        candidate_ROI_idx = tf.squeeze(tf.where(tf.logical_and(objectness > 0.45, conf_score > self.conf_threshold)))
         tf.print("candidate_ROI", tf.shape(candidate_ROI_idx))
 
         if tf.size(candidate_ROI_idx) == 0:
