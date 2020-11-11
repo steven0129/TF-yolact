@@ -119,7 +119,7 @@ valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
                                                 batch_size=1,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.4, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.7, nms_threshold=0.5, anchors=anchors)
 
 for image, labels in valid_dataset.take(1):
     tf.print( 'classes', tf.boolean_mask(labels['classes'], labels['classes'] > 0) )
