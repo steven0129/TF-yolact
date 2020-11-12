@@ -90,6 +90,22 @@ class Detect(object):
 
 class PRCurve():
     def __init__(self, prediction, ground_truth, sz_mode='all'):
+        self.label_mapping = [
+            'Background',
+            'Face',
+            'Body',
+            'Bicycle',
+            'Car',
+            'Motorbike',
+            'Airplane',
+            'Ship',
+            'Bird',
+            'Cat',
+            'Dog',
+            'Horse',
+            'Cow'
+        ]
+    
         if sz_mode == 'all':
             self.prediction = prediction
             self.ground_truth = ground_truth
@@ -110,7 +126,7 @@ class PRCurve():
         recalls = []
         
         gt = list(filter(lambda x: x['class'] == cls_idx, self.ground_truth))
-        pred = list(filter(lambda x: x['class'] == cls_idx, prediction))
+        pred = list(filter(lambda x: x['class'] == cls_idx, self.prediction))
         pred = sorted(pred, key=lambda x: x['score'], reverse=True)
 
         total_gt_num = len(gt)
@@ -118,26 +134,46 @@ class PRCurve():
         if len(gt) != 0:
             for pidx, p in enumerate(pred):
                 iou = []
-                for g in gt:
-                    if not use_maskiou:
-                        iou.append(utils.jaccard_numpy(p['bbox'], g['bbox']))
-                    else:
-                        curr_iou = self._maskiou(p['mask'], g['mask'])
-                        if curr_iou != -1:
-                            iou.append(curr_iou)
+                img_idx = p['img_idx']
+                img = cv2.imread(p['origin'])
+                filename = p['filename']
+                
+                for g in filter(lambda x: x['img_idx'] == img_idx, gt):
+                    iou.append((utils.jaccard_numpy(p['bbox'], g['bbox']), g))
 
-                if(len(list(filter(lambda x: x > iou_threshold, iou))) != 0):
+                filtered_iou = list(filter(lambda x: x[0] > iou_threshold, iou))
+                if(len(filtered_iou) != 0):
+                    max_iou = max(filtered_iou, key=lambda x: x[0])
+                    if max_iou[0] < iou_threshold + 0.1:
+                        g = max_iou[1]
+                        iou_file_folder = f'AP/{self.label_mapping[cls_idx]}/iou_{iou_threshold}-{iou_threshold + 0.1}'
+                        if not os.path.isdir(iou_file_folder):
+                            os.mkdir(iou_file_folder)
+                        
+                        # Draw ground truth
+                        cv2.rectangle(img, (g['bbox'][1], g['bbox'][0]), (g['bbox'][3], g['bbox'][2]), (0, 0, 255), 2)
+                        cv2.putText(img, self.label_mapping[g['class']], (int(g['bbox'][1]), int(g['bbox'][0]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 255), 1)
+                        
+                        # Draw prediction
+                        cv2.rectangle(img, (p['bbox'][1], p['bbox'][0]), (p['bbox'][3], p['bbox'][2]), (255, 0, 0), 2)
+                        cv2.putText(img, self.label_mapping[p['class']], (int(p['bbox'][1]), int(p['bbox'][0]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 0, 0), 1)
+                        
+                        # Draw segmentation
+                        mask = p['mask'].astype(np.uint8)
+                        mask[mask > 0] = p['class']
+                        mask = mask / 13 * 255
+                        mask = 255 - mask
+
+                        # Save image
+                        cv2.imwrite(f'{iou_file_folder}/{filename.split(".")[0]}_{pidx}_mask.png', mask)
+                        cv2.imwrite(f'{iou_file_folder}/{filename.split(".")[0]}_{pidx}_box.png', img)
+                    
                     TP += 1
                 else:
                     FP += 1
 
                 precisions.append(TP / (pidx + 1))
                 recalls.append(TP / total_gt_num)
-
-                for idx, curr_iou in enumerate(iou):
-                    if curr_iou > iou_threshold:
-                        del gt[idx]
-                        break
 
         return recalls, precisions
 
@@ -168,7 +204,7 @@ YOLACT = lite.MyYolact(input_size=256,
 
 model = YOLACT.gen()
 
-ckpt_dir = "checkpoints-SGD"
+ckpt_dir = "checkpoints-SGD-20201019"
 latest = tf.train.latest_checkpoint(ckpt_dir)
 
 checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
@@ -206,11 +242,12 @@ confusion_matrix = [[0 for _ in range(13)] for j in range(13)]
 ground_truth = []
 prediction = []
 
-for index, (image, labels) in enumerate(tqdm(valid_dataset)):
+for img_idx, (image, labels) in enumerate(tqdm(valid_dataset)):
     # only try on 1 image
     output = model(image, training=False)
     detection = detect_layer(output)
 
+    filename = labels['filename'].numpy().tolist()[0].decode('utf-8')
     gt_bbox = labels['bbox'].numpy()
     gt_mask = labels['mask_target'].numpy().astype(int)
     gt_cls = labels['classes'].numpy()
@@ -219,15 +256,36 @@ for index, (image, labels) in enumerate(tqdm(valid_dataset)):
     if detection[0]['detection'] != None:
         my_cls, scores, bbox, masks = postprocess(detection, 256, 256, 0, 'bilinear')
         my_cls, scores, bbox, masks = my_cls.numpy(), scores.numpy(), bbox.numpy(), masks.numpy()
+        
+        for label_name in remapping:
+            if not os.path.isdir(f'AP/{label_name}') and not label_name == 'Background':
+                os.mkdir(f'AP/{label_name}')
+                os.mkdir(f'AP/{label_name}/origin')
+
         for idx in range(num_obj[0]):
+            gt_cls_idx = gt_cls[0][idx]
+            gt_cls_name = remapping[gt_cls[0][idx]]
+
+            AP_file_path = f'AP/{gt_cls_name}/origin/{filename.split(".")[0]}.png'
+            deimage = denormalize_image(image)
+            deimage = tf.squeeze(deimage).numpy()
+            deimage = cv2.cvtColor(deimage, cv2.COLOR_BGR2RGB)
+            cv2.imwrite(AP_file_path, deimage)
+            
             ground_truth.append({
-                'class': gt_cls[0][idx],
+                'img_idx': img_idx,
+                'filename': filename,
+                'origin': AP_file_path,
+                'class': gt_cls_idx,
                 'mask': gt_mask[0][idx],
                 'bbox': gt_bbox[0][idx],
             })
 
         for idx in range(bbox.shape[0]):
             prediction.append({
+                'img_idx': img_idx,
+                'filename': filename,
+                'origin': AP_file_path,
                 'class': my_cls[idx] + 1,
                 'score': scores[idx],
                 'mask': masks[idx],
@@ -235,7 +293,7 @@ for index, (image, labels) in enumerate(tqdm(valid_dataset)):
             })
 
 for iou_type in tqdm(['box']):
-    for sz_mode in tqdm(['all', 'small', 'medium', 'large']):
+    for sz_mode in tqdm(['all']):
         PRObj = PRCurve(prediction, ground_truth, sz_mode=sz_mode)
 
         with open(f'AP/AP_{iou_type}_{sz_mode}.csv', 'w') as FILE:
