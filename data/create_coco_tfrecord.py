@@ -724,6 +724,7 @@ def create_tf_example(image,
     area = []
     encoded_mask_png = []
     num_annotations_skipped = 0
+    is_skipped = False
     dp_triggered = True  # DensePose preprocessing just one time
 
     for object_annotations in annotations_list:
@@ -838,6 +839,13 @@ def create_tf_example(image,
             pil_image.save(output_io, format='PNG')
             encoded_mask_png.append(output_io.getvalue())
 
+    for idx, crowd in enumerate(is_crowd):
+        if crowd == 1:
+            is_skipped = True
+
+        if ((xmax[idx] - xmin[idx]) * (ymax[idx] - ymin[idx]) < 0.1 * 0.1) or ((xmax[idx] - xmin[idx]) * (ymax[idx] - ymin[idx]) > 0.95 * 0.95):
+            is_skipped = True
+
     # Label Remapping
     # Background --> 0
     remapping = {
@@ -866,6 +874,10 @@ def create_tf_example(image,
             dataset_util.int64_feature(r),
         'image/filename':
             dataset_util.bytes_feature(filename.encode('utf8')),
+        'image/fullpath':
+            dataset_util.bytes_feature(full_path.encode('utf8')),
+        'image/dataset':
+            dataset_util.bytes_feature('coco'.encode('utf8')),
         'image/source_id':
             dataset_util.bytes_feature(str(image_id).encode('utf8')),
         'image/key/sha256':
@@ -895,9 +907,9 @@ def create_tf_example(image,
     }
     
     example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
-    return key, example, num_annotations_skipped, category_ids
+    return key, example, num_annotations_skipped, category_ids, is_skipped
 
-def create_scene_parse_tf_example(filename, image, masks, category_ids):
+def create_scene_parse_tf_example(filename, image, masks, category_ids, fullpath):
     image_id = filename.split('.')[0].split('_')[2]
     w, h = image.size
 
@@ -916,6 +928,7 @@ def create_scene_parse_tf_example(filename, image, masks, category_ids):
     areas = []
     encoded_mask_pngs = []
     is_crowd = []
+    is_skipped = False
 
     for mask in masks:
         prop = regionprops(mask)[0]
@@ -932,11 +945,22 @@ def create_scene_parse_tf_example(filename, image, masks, category_ids):
         encoded_mask_pngs.append(output_io.getvalue())
         is_crowd.append(0)
 
+    for idx, crowd in enumerate(is_crowd):
+        if crowd == 1:
+            is_skipped = True
+
+        if ((xmax[idx] - xmin[idx]) * (ymax[idx] - ymin[idx]) < 0.1 * 0.1) or ((xmax[idx] - xmin[idx]) * (ymax[idx] - ymin[idx]) > 0.95 * 0.95):
+            is_skipped = True
+
     feature_dict = {
         'image/height':
             dataset_util.int64_feature(r),
         'image/width':
             dataset_util.int64_feature(r),
+        'image/fullpath':
+            dataset_util.bytes_feature(fullpath.encode('utf-8')),
+        'image/dataset':
+            dataset_util.bytes_feature('scene_parse'.encode('utf-8')),
         'image/filename':
             dataset_util.bytes_feature(filename.encode('utf-8')),
         'image/source_id':
@@ -968,9 +992,9 @@ def create_scene_parse_tf_example(filename, image, masks, category_ids):
     }
 
     example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
-    return example
+    return example, is_skipped
 
-def create_openimages_tf_example(image_id, image, masks, xmin, xmax, ymin, ymax, category_ids):
+def create_openimages_tf_example(image_id, image, masks, xmin, xmax, ymin, ymax, category_ids, fullpath):
     w, h = image.size
 
     image = image.convert('RGB')
@@ -984,6 +1008,7 @@ def create_openimages_tf_example(image_id, image, masks, xmin, xmax, ymin, ymax,
     areas = []
     encoded_mask_pngs = []
     is_crowd = []
+    is_skipped = False
 
     for mask in masks:
         areas.append(0)
@@ -997,11 +1022,22 @@ def create_openimages_tf_example(image_id, image, masks, xmin, xmax, ymin, ymax,
         encoded_mask_pngs.append(output_io.getvalue())
         is_crowd.append(0)
 
+    for idx, crowd in enumerate(is_crowd):
+        if crowd == 1:
+            is_skipped = True
+
+        if ((xmax[idx] - xmin[idx]) * (ymax[idx] - ymin[idx]) < 0.1 * 0.1) or ((xmax[idx] - xmin[idx]) * (ymax[idx] - ymin[idx]) > 0.95 * 0.95):
+            is_skipped = True
+
     feature_dict = {
         'image/height':
             dataset_util.int64_feature(r),
         'image/width':
             dataset_util.int64_feature(r),
+        'image/fullpath': 
+            dataset_util.bytes_feature(fullpath.encode('utf8')),
+        'image/dataset':
+            dataset_util.bytes_feature('openimages'.encode('utf-8')),
         'image/filename':
             dataset_util.bytes_feature(f'{image_id}.png'.encode('utf-8')),
         'image/source_id':
@@ -1033,7 +1069,7 @@ def create_openimages_tf_example(image_id, image, masks, xmin, xmax, ymin, ymax,
     }
 
     example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
-    return example
+    return example, is_skipped
 
 def _create_tf_record_from_coco_annotations(
         annotations_file, image_dir, output_path, num_shards):
@@ -1094,18 +1130,19 @@ def _create_tf_record_from_coco_annotations(
                     num_crowd += 1
             
             if num_crowd != len(annotations_list):
-                _, tf_example, num_annotations_skipped, category_ids = create_tf_example(image, annotations_list, image_dir, category_index)
-                num_instances = len(category_ids)
-                if num_instances != 0:
-                    num_images += 1
+                _, tf_example, num_annotations_skipped, category_ids, is_skipped = create_tf_example(image, annotations_list, image_dir, category_index)
+                if not is_skipped:
+                    num_instances = len(category_ids)
+                    if num_instances != 0:
+                        num_images += 1
 
-                    for cat_id in category_ids:
-                        category_counts[cat_id] += 1
+                        for cat_id in category_ids:
+                            category_counts[cat_id] += 1
 
-                    total_num_annotations_skipped += num_annotations_skipped
-                    total_num_instances += num_instances
-                    shard_idx = idx % num_shards
-                    output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+                        total_num_annotations_skipped += num_annotations_skipped
+                        total_num_instances += num_instances
+                        shard_idx = idx % num_shards
+                        output_tfrecords[shard_idx].write(tf_example.SerializeToString())
 
                 # # Horizontal Flip Augmentation
                 # _, tf_example, num_annotations_skipped, category_ids = create_tf_horizontal_flip_example(image, annotations_list, image_dir, category_index)
@@ -1161,6 +1198,7 @@ def _create_tf_record_from_coco_annotations(
                     annpath = filepath.split('.')[0] + '.png'
 
                     img = Image.open(f'data/scene-parse-ins/images/{filepath}')
+                    fullpath = f'data/scene-parse-ins/images/{filepath}'
                     ann = np.array(Image.open(f'data/scene-parse-ins/annotations_instance/{annpath}'))
 
                     cls_label = ann[:, :, 0]
@@ -1188,8 +1226,9 @@ def _create_tf_record_from_coco_annotations(
                         if len(masks) != 0:
                             num_image += 1
                             num_instances += len(category_ids)
-                            tf_example = create_scene_parse_tf_example(filepath.split('/')[1], img, masks, category_ids)
-                            output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+                            tf_example, is_skipped = create_scene_parse_tf_example(filepath.split('/')[1], img, masks, category_ids, fullpath)
+                            if not is_skipped:
+                                output_tfrecords[shard_idx].write(tf_example.SerializeToString())
 
                 open('scene-parse-info-val.txt', 'w').write(f'images: {num_image}, instances: {num_instances}')
 
@@ -1204,6 +1243,7 @@ def _create_tf_record_from_coco_annotations(
                     annpath = filepath.split('.')[0] + '.png'
 
                     img = Image.open(f'data/scene-parse-ins/images/{filepath}')
+                    fullpath = f'data/scene-parse-ins/images/{filepath}'
                     ann = np.array(Image.open(f'data/scene-parse-ins/annotations_instance/{annpath}'))
 
                     cls_label = ann[:, :, 0]
@@ -1231,8 +1271,9 @@ def _create_tf_record_from_coco_annotations(
                         if len(masks) != 0:
                             num_image += 1
                             num_instances += len(category_ids)
-                            tf_example = create_scene_parse_tf_example(filepath.split('/')[1], img, masks, category_ids)
-                            output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+                            tf_example, is_skipped = create_scene_parse_tf_example(filepath.split('/')[1], img, masks, category_ids, fullpath)
+                            if not is_skipped:
+                                output_tfrecords[shard_idx].write(tf_example.SerializeToString())
 
                 open('scene-parse-info-train.txt', 'w').write(f'images: {num_image}, instances: {num_instances}')
 
@@ -1322,6 +1363,7 @@ def _create_tf_record_from_coco_annotations(
                 for idx, (imageID, data) in enumerate(tqdm(hashtable.items())):
                     shard_idx = idx % num_shards
                     img = Image.open(f'data/openimages-20200928/train-images-256x256/{imageID}.png')
+                    fullpath = f'data/openimages-20200928/train-images-256x256/{imageID}.png'
                     masks = list(map(lambda x: Image.open(f'data/openimages-20200928/train-masks-256x256/{x}'), data['MaskPath']))
                     xmin = data['xmin']
                     xmax = data['xmax']
@@ -1329,8 +1371,9 @@ def _create_tf_record_from_coco_annotations(
                     ymax = data['ymax']
                     category_ids = list(map(lambda x: remapping[x], data['category_names']))
 
-                    tf_example = create_openimages_tf_example(imageID, img, masks, xmin, xmax, ymin, ymax, category_ids)
-                    output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+                    tf_example, is_skipped = create_openimages_tf_example(imageID, img, masks, xmin, xmax, ymin, ymax, category_ids, fullpath)
+                    if not is_skipped:
+                        output_tfrecords[shard_idx].write(tf_example.SerializeToString())
 
         if image_dir == FLAGS.val_image_dir:
             with open('data/openimages-20200928/validation-annotations-object-segmentation.csv') as FILE:
@@ -1360,6 +1403,7 @@ def _create_tf_record_from_coco_annotations(
                 for idx, (imageID, data) in enumerate(tqdm(hashtable.items())):
                     shard_idx = idx % num_shards
                     img = Image.open(f'data/openimages-20200928/valid-images-256x256/{imageID}.png')
+                    fullpath = f'data/openimages-20200928/valid-images-256x256/{imageID}.png'
                     masks = list(map(lambda x: Image.open(f'data/openimages-20200928/valid-masks-256x256/{x}'), data['MaskPath']))
                     xmin = data['xmin']
                     xmax = data['xmax']
@@ -1367,8 +1411,9 @@ def _create_tf_record_from_coco_annotations(
                     ymax = data['ymax']
                     category_ids = list(map(lambda x: remapping[x], data['category_names']))
 
-                    tf_example = create_openimages_tf_example(imageID, img, masks, xmin, xmax, ymin, ymax, category_ids)
-                    output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+                    tf_example, is_skipped = create_openimages_tf_example(imageID, img, masks, xmin, xmax, ymin, ymax, category_ids, fullpath)
+                    if not is_skipped:
+                        output_tfrecords[shard_idx].write(tf_example.SerializeToString())
 
 
 def main(_):
