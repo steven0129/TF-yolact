@@ -8,7 +8,7 @@ import tensorflow as tf
 
 from layers.fpn import FeaturePyramidNeck
 from layers.head import PredictionModule
-from layers.protonet import PADModule
+from layers.protonet import PADModule, ProtoNet
 from layers.pretrained import MobileNetV1
 from layers.pretrained import MobileNetV2
 from layers.shufflenet import ShuffleNetV2
@@ -22,10 +22,15 @@ class MyYolact():
         self.input_shape = (input_size, input_size, 3)
         self.backbone_pretrained = MobileNetV2(input_shape=(self.input_shape)).gen()
         self.backbone_pretrained.trainable = True
+        use_padmodule = True
 
         # extract certain feature maps for FPN
         self.backbone_fpn = FeaturePyramidNeck(fpn_channels, bidirectional=True)
-        self.protonet = PADModule(num_mask)
+        
+        if use_padmodule:
+            self.protonet = PADModule(num_mask)
+        else:
+            self.protonet = ProtoNet(num_mask)
 
         # semantic segmentation branch to boost feature richness
         self.semantic_segmentation = tf.keras.layers.Conv2D(num_class, (1, 1), 1, padding="same",
