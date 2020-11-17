@@ -182,7 +182,7 @@ def export_tflite():
     checkpoint.restore(tf.train.latest_checkpoint(ckpt_dir))
 
     exporter = TFLiteExporter(model)
-    exporter.export('yolact-20201027.tflite')
+    exporter.export('yolact.tflite')
 
 def export_mongo():
     exporter = MongoExporter('data/obj_tfrecord_256x256_20201102', 'obj_256x256_20201102', subset='val')
