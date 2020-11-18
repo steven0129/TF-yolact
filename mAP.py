@@ -12,81 +12,9 @@ from yolact import Yolact
 from utils.utils import postprocess, denormalize_image
 from utils import utils
 from tqdm import tqdm
+from detect import Detect
 
 import cv2
-
-class Detect(object):
-    def __init__(self, num_cls, label_background, top_k, conf_threshold, nms_threshold, anchors):
-        self.num_cls = num_cls
-        self.label_background = label_background
-        self.top_k = top_k
-        self.nms_threshold = nms_threshold
-        self.conf_threshold = conf_threshold
-        self.anchors = anchors
-
-    def __call__(self, model_output):
-        prediction = {
-            'proto_out': model_output[1],
-            'pred_cls': model_output[2],
-            'pred_offset': model_output[3],
-            'pred_mask_coef': model_output[4]
-        }
-
-        loc_pred = prediction['pred_offset']
-        cls_pred = prediction['pred_cls']
-        mask_pred = prediction['pred_mask_coef']
-        proto_pred = prediction['proto_out']
-        out = []
-        num_batch = tf.shape(loc_pred)[0]
-        num_anchors = tf.shape(loc_pred)[1]
-
-        for batch_idx in tf.range(num_batch):
-            # add offset to anchors
-            decoded_boxes = utils.map_to_bbox(self.anchors, loc_pred[batch_idx])
-            # do detection
-            result = self._detection(batch_idx, cls_pred, decoded_boxes, mask_pred)
-            if result is not None and proto_pred is not None:
-                result['proto'] = proto_pred[batch_idx]
-            out.append({'detection': result})
-
-        return out
-
-    def _detection(self, batch_idx, cls_pred, decoded_boxes, mask_pred):
-        objectness = tf.math.sigmoid(cls_pred[batch_idx, :, 0])
-        classification = tf.nn.softmax(cls_pred[batch_idx, :, 1:], axis=-1)
-
-        cur_score = tf.transpose( tf.reshape(objectness, [-1, 1]) * classification , perm=[1, 0])
-        conf_score = tf.math.reduce_max(cur_score, axis=0)
-        conf_score_id = tf.argmax(cur_score, axis=0)
-
-        # filter out the ROI that have conf score > confidence threshold
-        candidate_ROI_idx = tf.squeeze(tf.where(conf_score > self.conf_threshold))
-
-        if tf.size(candidate_ROI_idx) == 0:
-            return None
-
-        # scores = tf.gather(cur_score, candidate_ROI_idx, axis=-1)
-        scores = tf.gather(conf_score, candidate_ROI_idx)
-        classes = tf.gather(conf_score_id, candidate_ROI_idx)
-        boxes = tf.gather(decoded_boxes, candidate_ROI_idx)
-        masks = tf.gather(mask_pred[batch_idx], candidate_ROI_idx)
-
-        if tf.shape(tf.shape(boxes))[0] == 1:
-            scores = tf.expand_dims(scores, axis=0)
-            boxes = tf.expand_dims(boxes, axis=0)
-            masks = tf.expand_dims(masks, axis=0)
-            classes = tf.expand_dims(classes, axis=0)
-
-            return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
-        
-        selected_indices = tf.image.non_max_suppression(boxes, scores, 100, self.nms_threshold)
-
-        boxes = tf.gather(boxes, selected_indices)
-        scores = tf.gather(scores, selected_indices)
-        masks = tf.gather(masks, selected_indices)
-        classes = tf.gather(classes, selected_indices)
-
-        return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
 
 class PRCurve():
     def __init__(self, prediction, ground_truth, sz_mode='all'):
@@ -204,7 +132,7 @@ YOLACT = lite.MyYolact(input_size=256,
 
 model = YOLACT.gen()
 
-ckpt_dir = "checkpoints-SGD-20201019"
+ckpt_dir = "checkpoints-SGD"
 latest = tf.train.latest_checkpoint(ckpt_dir)
 
 checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
@@ -216,10 +144,10 @@ print("Restore Ckpt Sucessfully!!")
 # Need default anchor
 anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
 valid_dataset = dataset_coco.prepare_evalloader(img_size=256,
-                                                tfrecord_dir='data/obj_tfrecord_256x256_20200930',
+                                                tfrecord_dir='data/obj_tfrecord_256x256_20201102',
                                                 subset='val')
 anchors = anchorobj.get_anchors()
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.4, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.7, nms_threshold=0.5, anchors=anchors)
 
 remapping = [
     'Background',
