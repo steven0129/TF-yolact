@@ -22,12 +22,12 @@ class MyYolact():
         self.input_shape = (input_size, input_size, 3)
         self.backbone_pretrained = MobileNetV2(input_shape=(self.input_shape)).gen()
         self.backbone_pretrained.trainable = True
-        use_padmodule = True
+        self.use_padmodule = False
 
         # extract certain feature maps for FPN
         self.backbone_fpn = FeaturePyramidNeck(fpn_channels, bidirectional=True)
         
-        if use_padmodule:
+        if self.use_padmodule:
             self.protonet = PADModule(num_mask)
         else:
             self.protonet = ProtoNet(num_mask)
@@ -59,7 +59,10 @@ class MyYolact():
         p3, p4, p5, _, _ = fpn_out
 
         # Protonet Branch
-        protonet_out = self.protonet(p3, p4, p5)
+        if self.use_padmodule:
+            protonet_out = self.protonet(p3, p4, p5)
+        else:
+            protonet_out = self.protonet(p3)
 
         # Semantic Segmentation Branch
         seg = self.semantic_segmentation(p3)
