@@ -43,9 +43,8 @@ class Anchor(object):
                     ymax = y + (h / 2)
                     xmax = x + (w / 2)
                     prior_boxes += [ymin * img_size, xmin * img_size, ymax * img_size, xmax * img_size]
-                count_anchor += 1
+                    num_anchors += 1
             
-            num_anchors += count_anchor
         output = tf.reshape(tf.convert_to_tensor(prior_boxes), [-1, 4])
         return num_anchors, output
 
