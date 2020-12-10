@@ -12,6 +12,7 @@ from exporter import TFLiteExporter
 
 import yolact
 from data import dataset_coco
+from data import anchor
 from loss import loss_yolact
 from utils import learning_rate_schedule
 
@@ -150,11 +151,10 @@ def main(argv):
     logging.info("Creating the model instance of YOLACT")
     YOLACT = lite.MyYolact(input_size=256,
                           fpn_channels=96,
+                          anchorobj=anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2]),
                           feature_map_size=[32, 16, 8, 4, 2],
                           num_class=13, # 12 classes + 1 background
-                          num_mask=32,
-                          aspect_ratio=[1, 0.5, 2],
-                          scales=[24, 48, 96, 192, 384])
+                          num_mask=32)
 
     model = YOLACT.gen()
 
@@ -205,7 +205,7 @@ def main(argv):
 
         # setup checkpoints manager
         checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=optimizer, model=model)
-        manager = tf.train.CheckpointManager(checkpoint, directory=f'./checkpoints-{optimizer_name}', max_to_keep=5)
+        manager = tf.train.CheckpointManager(checkpoint, directory=f'./checkpoints-{optimizer_name}', max_to_keep=20)
 
         # restore from latest checkpoint and iteration
         status = checkpoint.restore(manager.latest_checkpoint)

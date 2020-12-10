@@ -7,16 +7,19 @@ import tensorflow as tf
 # Can generate one instance only when creating the model
 class Anchor(object):
 
-    def __init__(self, img_size, feature_map_size, aspect_ratio, scale):
+    def __init__(self, img_size, feature_map_size):
         """
         :param img_size:
         :param feature_map_size:
         :param aspect_ratio:
         :param scale:
         """
-        self.num_anchors, self.anchors = self._generate_anchors(img_size, feature_map_size, aspect_ratio, scale)
+        self.aspect_ratio = [[0.14999998, 0.16500002], [0.32083333, 0.38333303], [0.73625, 0.677805]]
+        self.scale = [16, 32, 64, 128, 256]
+        self.num_anchors, self.anchors = self._generate_anchors(img_size, feature_map_size)
+        
 
-    def _generate_anchors(self, img_size, feature_map_size, aspect_ratio, scale):
+    def _generate_anchors(self, img_size, feature_map_size):
         """
         :param img_size:
         :param feature_map_size:
@@ -31,13 +34,12 @@ class Anchor(object):
             for j, i in product(range(f_size), range(f_size)):
                 x = (i + 0.5) / f_size
                 y = (j + 0.5) / f_size
-                for ars in aspect_ratio:
-                    a = sqrt(ars)
-                    w = scale[idx] * a / img_size
-                    h = scale[idx] / a / img_size
-                    # the author od original paper accidetly use square anchor all the time
-                    h = w
-                    # directly use point form here => [ymin, xmin, ymax, xmax]
+                for ars in self.aspect_ratio:
+                    [ars_w, ars_h] = ars
+                    a = ars_h / ars_w
+                    w = self.scale[idx] * a / img_size
+                    h = self.scale[idx] / a / img_size
+                    
                     ymin = y - (h / 2)
                     xmin = x - (w / 2)
                     ymax = y + (h / 2)

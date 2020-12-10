@@ -57,9 +57,8 @@ class Detect(object):
         conf_score_id = tf.argmax(classification, axis=-1)
 
         # filter out the ROI that have conf score > confidence threshold
-        test_indices = tf.where(objectness > 0.45)
-        test_objectness = tf.gather(objectness, test_indices)
-        candidate_ROI_idx = tf.squeeze(tf.where(tf.logical_and(objectness > 0.45, conf_score > self.conf_threshold)))
+        test_objectness = tf.gather(objectness, tf.where(objectness > 0.43))
+        candidate_ROI_idx = tf.squeeze(tf.where(tf.logical_and(objectness > 0.43, conf_score > self.conf_threshold)))
 
         if tf.size(candidate_ROI_idx) == 0:
             return None
@@ -90,13 +89,15 @@ class Detect(object):
 lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=1e-3)
 optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=0.9)
 
-YOLACT = lite.MyYolact(input_size=256,
-               fpn_channels=96,
-               feature_map_size=[32, 16, 8, 4, 2],
-               num_class=13,
-               num_mask=32,
-               aspect_ratio=[1, 0.5, 2],
-               scales=[24, 48, 96, 192, 384])
+anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2])
+YOLACT = lite.MyYolact(
+    input_size=256,
+    fpn_channels=96, 
+    anchorobj=anchorobj,
+    feature_map_size=[32, 16, 8, 4, 2], 
+    num_class=13, # 12 classes + 1 background
+    num_mask=32
+)
 
 model = YOLACT.gen()
 
@@ -105,17 +106,18 @@ latest = tf.train.latest_checkpoint(ckpt_dir)
 
 checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
 status = checkpoint.restore(tf.train.latest_checkpoint(ckpt_dir))
+# status = checkpoint.restore('checkpoints-SGD/ckpt-36')
 
 # Load Validation Images and do Detection
 # -----------------------------------------------------------------------------------------------
 # Need default anchor
-anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
+
 valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
                                                 tfrecord_dir='data/obj_tfrecord_256x256_20201102',
                                                 batch_size=1,
                                                 subset='val')
 anchors = anchorobj.get_anchors()
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.7, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.95, nms_threshold=0.5, anchors=anchors)
 
 if __name__ == '__main__':
     for image, labels in valid_dataset.take(1):

@@ -165,7 +165,7 @@ print("Restore Ckpt Sucessfully!!")
 # Load Validation Images and do Detection
 # -----------------------------------------------------------------------------------------------
 # Need default anchor
-anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
+anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2])
 valid_dataset = dataset_coco.prepare_evalloader(img_size=256,
                                                 tfrecord_dir='data/obj_tfrecord_256x256_20200930',
                                                 subset='val')

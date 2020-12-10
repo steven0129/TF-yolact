@@ -122,13 +122,15 @@ class PRCurve():
 lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=1e-3)
 optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=0.9)
 
-YOLACT = lite.MyYolact(input_size=256,
-               fpn_channels=96,
-               feature_map_size=[32, 16, 8, 4, 2],
-               num_class=13,
-               num_mask=32,
-               aspect_ratio=[1, 0.5, 2],
-               scales=[24, 48, 96, 192, 384])
+anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2])
+YOLACT = lite.MyYolact(
+    input_size=256,
+    fpn_channels=96, 
+    anchorobj=anchorobj,
+    feature_map_size=[32, 16, 8, 4, 2], 
+    num_class=13, # 12 classes + 1 background
+    num_mask=32
+)
 
 model = YOLACT.gen()
 
@@ -142,12 +144,12 @@ print("Restore Ckpt Sucessfully!!")
 # Load Validation Images and do Detection
 # -----------------------------------------------------------------------------------------------
 # Need default anchor
-anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
+
 valid_dataset = dataset_coco.prepare_evalloader(img_size=256,
                                                 tfrecord_dir='data/obj_tfrecord_256x256_20201102',
                                                 subset='val')
 anchors = anchorobj.get_anchors()
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.7, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.95, nms_threshold=0.5, anchors=anchors)
 
 remapping = [
     'Background',

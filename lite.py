@@ -17,7 +17,7 @@ from utils.create_prior import make_priors
 assert tf.__version__.startswith('2')
 
 class MyYolact():
-    def __init__(self, input_size, fpn_channels, feature_map_size, num_class, num_mask, aspect_ratio, scales):
+    def __init__(self, input_size, fpn_channels, anchorobj, feature_map_size, num_class, num_mask):
         # use pre-trained MobileNetV2
         self.input_shape = (input_size, input_size, 3)
         self.backbone_pretrained = MobileNetV2(input_shape=(self.input_shape)).gen()
@@ -35,18 +35,13 @@ class MyYolact():
         # semantic segmentation branch to boost feature richness
         self.semantic_segmentation = tf.keras.layers.Conv2D(num_class, (1, 1), 1, padding="same",
                                                             kernel_initializer=tf.keras.initializers.glorot_uniform())
-
-        self.num_anchor, self.priors = make_priors(input_size, feature_map_size, aspect_ratio, scales)
-        print("prior shape:", self.priors.shape)
-        print("num anchor per feature map: ", self.num_anchor)
-
         # shared prediction head
         self.pred_head = [
-            PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask),
-            PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask),
-            PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask),
-            PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask),
-            PredictionModule(fpn_channels, len(aspect_ratio), num_class, num_mask)
+            PredictionModule(fpn_channels, len(anchorobj.aspect_ratio), num_class, num_mask),
+            PredictionModule(fpn_channels, len(anchorobj.aspect_ratio), num_class, num_mask),
+            PredictionModule(fpn_channels, len(anchorobj.aspect_ratio), num_class, num_mask),
+            PredictionModule(fpn_channels, len(anchorobj.aspect_ratio), num_class, num_mask),
+            PredictionModule(fpn_channels, len(anchorobj.aspect_ratio), num_class, num_mask)
         ]
 
         self.concat = tf.keras.layers.Concatenate(axis=1)

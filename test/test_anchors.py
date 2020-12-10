@@ -15,10 +15,7 @@ test_labels = tf.convert_to_tensor((np.array([[1],
                                               [4],
                                               [5]])), dtype=tf.float32)
 
-anchorobj = anchor.Anchor(img_size=550,
-                          feature_map_size=[69, 35, 18, 9, 5],
-                          aspect_ratio=[1, 0.5, 2],
-                          scale=[24, 48, 96, 192, 384])
+anchorobj = anchor.Anchor(img_size=550, feature_map_size=[69, 35, 18, 9, 5])
 print(anchorobj.get_anchors())
 
 target_cls, target_loc, max_id_for_anchors, match_positiveness = anchorobj.matching(threshold_pos=0.5,

@@ -16,10 +16,7 @@ from data import yolact_parser
 # Todo encapsulate it as a class, here is the place to get dataset(train, eval, test)
 def prepare_dataloader(tfrecord_dir, batch_size, img_size, subset="train"):
 
-    anchorobj = anchor.Anchor(img_size=img_size,
-                              feature_map_size=[32, 16, 8, 4, 2],
-                              aspect_ratio=[1, 0.5, 2],
-                              scale=[24, 48, 96, 192, 384])
+    anchorobj = anchor.Anchor(img_size=img_size, feature_map_size=[32, 16, 8, 4, 2])
 
     parser = yolact_parser.Parser(output_size=img_size,
                                   anchor_instance=anchorobj,
@@ -45,10 +42,7 @@ def prepare_dataloader(tfrecord_dir, batch_size, img_size, subset="train"):
 
 def prepare_evalloader(tfrecord_dir, img_size, subset="train"):
 
-    anchorobj = anchor.Anchor(img_size=img_size,
-                              feature_map_size=[32, 16, 8, 4, 2],
-                              aspect_ratio=[1, 0.5, 2],
-                              scale=[24, 48, 96, 192, 384])
+    anchorobj = anchor.Anchor(img_size=img_size, feature_map_size=[32, 16, 8, 4, 2])
 
     parser = yolact_parser.Parser(output_size=img_size,
                                   anchor_instance=anchorobj,

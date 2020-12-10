@@ -23,11 +23,8 @@ class TFLiteExporter():
         _, protonet_out, cls_result, offset_result, mask_branch_result = self.model(inputs)
         objectness = tf.math.sigmoid(cls_result[:, :, 0])
         classes_prob = tf.nn.softmax(cls_result[:, :, 1:], axis=-1)
-        protonet_out = self.reshape(protonet_out)
-        mask_output = tf.linalg.matmul(mask_branch_result, protonet_out, transpose_a=False, transpose_b=True)
-        mask_output = tf.nn.sigmoid(mask_output)
         
-        wrapper = tf.keras.Model(inputs, [objectness, classes_prob, offset_result, mask_output])
+        wrapper = tf.keras.Model(inputs, [objectness, classes_prob, offset_result, mask_branch_result, protonet_out])
         converter = tf.lite.TFLiteConverter.from_keras_model(wrapper)
         converter.experimental_new_converter=False
         tflite_model = converter.convert()

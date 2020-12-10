@@ -135,7 +135,7 @@ class YOLACTLoss(object):
         self._max_masks_for_train = max_masks_for_train
         self.focal_loss_with_logits = tfa.losses.SigmoidFocalCrossEntropy(from_logits=True, gamma=10)
         self.giou_loss = tfa.losses.GIoULoss(reduction=tf.keras.losses.Reduction.NONE)
-        self.anchors = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2], aspect_ratio=[1, 0.5, 2], scale=[24, 48, 96, 192, 384])
+        self.anchors = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2])
 
     def __call__(self, pred, label, num_classes):
         """
