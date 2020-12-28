@@ -16,13 +16,13 @@ from data import yolact_parser
 # Todo encapsulate it as a class, here is the place to get dataset(train, eval, test)
 def prepare_dataloader(tfrecord_dir, batch_size, img_size, subset="train"):
 
-    anchorobj = anchor.Anchor(img_size=img_size, feature_map_size=[32, 16, 8, 4, 2])
+    anchorobj = anchor.Anchor(img_size=img_size, feature_map_size=[69, 35, 18, 9, 5])
 
     parser = yolact_parser.Parser(output_size=img_size,
                                   anchor_instance=anchorobj,
                                   match_threshold=0.7,
                                   unmatched_threshold=0.7,
-                                  proto_output_size=64,
+                                  proto_output_size=138,
                                   mode=subset)
     files = tf.io.matching_files(os.path.join(tfrecord_dir, "obj_%s.*" % subset))
     num_shards = tf.cast(tf.shape(files)[0], tf.int64)
@@ -42,7 +42,7 @@ def prepare_dataloader(tfrecord_dir, batch_size, img_size, subset="train"):
 
 def prepare_evalloader(tfrecord_dir, img_size, subset="train"):
 
-    anchorobj = anchor.Anchor(img_size=img_size, feature_map_size=[32, 16, 8, 4, 2])
+    anchorobj = anchor.Anchor(img_size=img_size, feature_map_size=[69, 35, 18, 9, 5])
 
     parser = yolact_parser.Parser(output_size=img_size,
                                   anchor_instance=anchorobj,

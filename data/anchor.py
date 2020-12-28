@@ -15,7 +15,7 @@ class Anchor(object):
         :param scale:
         """
         self.aspect_ratio = [[0.14999998, 0.16500002], [0.32083333, 0.38333303], [0.73625, 0.677805]]
-        self.scale = [16, 32, 64, 128, 256]
+        self.scale = [24, 48, 96, 192, 384]
         self.num_anchors, self.anchors = self._generate_anchors(img_size, feature_map_size)
         
 

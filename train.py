@@ -137,22 +137,22 @@ def main(argv):
     # Creating dataloaders for training and validation
     logging.info("Creating the dataloader from: %s..." % FLAGS.tfrecord_dir)
     train_dataset = dataset_coco.prepare_dataloader(tfrecord_dir=FLAGS.tfrecord_dir,
-                                                    img_size=256,
+                                                    img_size=550,
                                                     batch_size=FLAGS.batch_size,
                                                     subset='train')
 
     valid_dataset = dataset_coco.prepare_dataloader(tfrecord_dir=FLAGS.tfrecord_dir,
-                                                    img_size=256,
+                                                    img_size=550,
                                                     batch_size=1,
                                                     subset='val')
     
     # -----------------------------------------------------------------
     # Creating the instance of the model specified.
     logging.info("Creating the model instance of YOLACT")
-    YOLACT = lite.MyYolact(input_size=256,
+    YOLACT = lite.MyYolact(input_size=550,
                           fpn_channels=96,
-                          anchorobj=anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2]),
-                          feature_map_size=[32, 16, 8, 4, 2],
+                          anchorobj=anchor.Anchor(img_size=550, feature_map_size=[69, 35, 18, 9, 5]),
+                          feature_map_size=[69, 35, 18, 9, 5],
                           num_class=13, # 12 classes + 1 background
                           num_mask=32)
 
@@ -297,7 +297,7 @@ def main(argv):
                                             trainer.v_seg.result()))
                 
                 best_val = trainer.valid_loss.result()
-                exporter = TFLiteExporter(model)
+                exporter = TFLiteExporter(model, input_size=550)
                 exporter.export('./weights/yolact_' + str(iterations) + '.tflite')
 
         trainer.reset_states()
