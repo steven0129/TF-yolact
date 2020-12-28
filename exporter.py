@@ -10,6 +10,7 @@ from utils import learning_rate_schedule
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from tqdm import tqdm
+from data import anchor
 
 class TFLiteExporter():
     def __init__(self, model, input_size=256):
@@ -23,9 +24,89 @@ class TFLiteExporter():
         _, protonet_out, cls_result, offset_result, mask_branch_result = self.model(inputs)
         objectness = tf.math.sigmoid(cls_result[:, :, 0])
         classes_prob = tf.nn.softmax(cls_result[:, :, 1:], axis=-1)
+        classes_prob = tf.reduce_max(classes_prob, axis=-1, keepdims=True)
         
         wrapper = tf.keras.Model(inputs, [objectness, classes_prob, offset_result, mask_branch_result, protonet_out])
         converter = tf.lite.TFLiteConverter.from_keras_model(wrapper)
+        converter.experimental_new_converter=False
+        tflite_model = converter.convert()
+        with tf.io.gfile.GFile(filename, 'wb') as F:
+            F.write(tflite_model)
+
+class MatMulExporter():
+    def __init__(self, input1_size=(32, 64, 64), input2_size=(32)):
+        self.input1_size = input1_size
+        self.input2_size = input2_size
+        self.flatten = tf.keras.layers.Flatten()
+        self.reshape = tf.keras.layers.Reshape((32, 64 * 64))
+        self.permute = tf.keras.layers.Permute((2, 1))
+
+    def export(self, filename):
+        inputs1 = tf.keras.Input(shape=self.input1_size)
+        inputs2 = tf.keras.Input(shape=self.input2_size)
+        x1 = self.reshape(inputs1)
+        x1 = self.permute(x1)
+        output = tf.linalg.matmul(x1, inputs2, transpose_a=False, transpose_b=True)
+        output = self.flatten(output)
+        model = tf.keras.Model([inputs1, inputs2], output)
+
+        converter = tf.lite.TFLiteConverter.from_keras_model(model)
+        converter.experimental_new_converter=False
+        tflite_model = converter.convert()
+        with tf.io.gfile.GFile(filename, 'wb') as F:
+            F.write(tflite_model)
+
+class MatMulUpSampleExporter():
+    def __init__(self, input1_size=(32, 64, 64), input2_size=(32)):
+        self.input1_size = input1_size
+        self.input2_size = input2_size
+        self.flatten = tf.keras.layers.Flatten()
+        self.reshape = tf.keras.layers.Reshape((32, 64 * 64))
+        self.reshape_wh = tf.keras.layers.Reshape((64, 64, 1))
+        self.permute = tf.keras.layers.Permute((2, 1))
+        self.upsample = tf.keras.layers.UpSampling2D(size=(4, 4), interpolation='bilinear')
+
+    def export(self, filename):
+        inputs1 = tf.keras.Input(shape=self.input1_size)
+        inputs2 = tf.keras.Input(shape=self.input2_size)
+        x1 = self.reshape(inputs1)
+        x1 = self.permute(x1)
+        output = tf.linalg.matmul(x1, inputs2, transpose_a=False, transpose_b=True)
+        output = self.reshape_wh(output)
+        output = self.upsample(output)
+        model = tf.keras.Model([inputs1, inputs2], output)
+
+        converter = tf.lite.TFLiteConverter.from_keras_model(model)
+        converter.experimental_new_converter=False
+        tflite_model = converter.convert()
+        with tf.io.gfile.GFile(filename, 'wb') as F:
+            F.write(tflite_model)
+
+class BBoxProcessorExporter():
+    def __init__(self, input1_size=(4), input2_size=(4)):
+        self.input1_size = input1_size
+        self.input2_size = input2_size
+        self.concat = tf.keras.layers.Concatenate()
+
+    def export(self, filename):
+        pred = tf.keras.Input(shape=self.input1_size)
+        prior = tf.keras.Input(shape=self.input2_size)
+
+        pred_cxy = pred[:, :2]
+        pred_wh = pred[:, 2:]
+        prior_cxy = prior[:, :2]
+        prior_wh = prior[:, 2:]
+
+        new_cxy = pred_cxy * (prior_wh * 0.1) + prior_cxy
+        new_wh = tf.exp(pred_wh * 0.2) * prior_wh
+
+        yxmin = new_cxy - (new_wh / 2)
+        yxmax = new_cxy + (new_wh / 2)
+
+        output = self.concat([yxmin, yxmax])
+        model = tf.keras.Model([pred, prior], output)
+
+        converter = tf.lite.TFLiteConverter.from_keras_model(model)
         converter.experimental_new_converter=False
         tflite_model = converter.convert()
         with tf.io.gfile.GFile(filename, 'wb') as F:
@@ -160,13 +241,15 @@ class MongoExporter():
         return image
     
 def export_tflite():
-    YOLACT = lite.MyYolact(input_size=256,
-               fpn_channels=96,
-               feature_map_size=[32, 16, 8, 4, 2],
-               num_class=13,
-               num_mask=32,
-               aspect_ratio=[1, 0.5, 2],
-               scales=[24, 48, 96, 192, 384])
+    anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2])
+    YOLACT = lite.MyYolact(
+        input_size=256,
+        fpn_channels=96, 
+        anchorobj=anchorobj,
+        feature_map_size=[32, 16, 8, 4, 2], 
+        num_class=13, # 12 classes + 1 background
+        num_mask=32
+    )
 
     model = YOLACT.gen()
 
@@ -181,6 +264,18 @@ def export_tflite():
     exporter = TFLiteExporter(model)
     exporter.export('yolact.tflite')
 
+def export_matmul():
+    exporter = MatMulExporter()
+    exporter.export('matmul.tflite')
+
+def export_matmul_upsample():
+    exporter = MatMulUpSampleExporter()
+    exporter.export('MatmulUpsample.tflite')
+
+def export_bbox_processor():
+    exporter = BBoxProcessorExporter()
+    exporter.export('bbox_processor.tflite')
+
 def export_mongo():
     exporter = MongoExporter('data/obj_tfrecord_256x256_20201102', 'obj_256x256_20201102', subset='val')
     exporter.export()
@@ -189,4 +284,4 @@ def export_mongo():
     exporter.export()
 
 if __name__ == '__main__':
-    export_mongo()    
+    export_matmul_upsample()
