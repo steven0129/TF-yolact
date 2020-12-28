@@ -40,10 +40,6 @@ class Detect(object):
         num_batch = tf.shape(loc_pred)[0]
         num_anchors = tf.shape(loc_pred)[1]
 
-        # apply softmax to pred_cls
-        # cls_pred = tf.nn.softmax(cls_pred, axis=-1)
-        # cls_pred = tf.transpose(cls_pred, perm=[0, 2, 1])
-
         for batch_idx in tf.range(num_batch):
             # add offset to anchors
             decoded_boxes = utils.map_to_bbox(self.anchors, loc_pred[batch_idx])
@@ -56,18 +52,15 @@ class Detect(object):
         return out
 
     def _detection(self, batch_idx, cls_pred, decoded_boxes, mask_pred):
-        # tf.print(f'cls_pred: {tf.shape(cls_pred)}')
         objectness = tf.math.sigmoid(cls_pred[batch_idx, :, 0])
-        # tf.print( 'objectness:', tf.boolean_mask(objectness, objectness > 0.5) )
         classification = tf.nn.softmax(cls_pred[batch_idx, :, 1:], axis=-1)
 
-        cur_score = tf.transpose( tf.reshape(objectness, [-1, 1]) * classification , perm=[1, 0])
-        conf_score = tf.math.reduce_max(cur_score, axis=0)
-        conf_score_id = tf.argmax(cur_score, axis=0)
-        # tf.print(tf.math.bincount(conf_score_id, dtype=tf.dtypes.int64))
+        conf_score = tf.math.reduce_max(classification, axis=-1)
+        conf_score_id = tf.argmax(classification, axis=-1)
 
         # filter out the ROI that have conf score > confidence threshold
-        candidate_ROI_idx = tf.squeeze(tf.where(conf_score > self.conf_threshold))
+        test_objectness = tf.gather(objectness, tf.where(objectness > 0.43))
+        candidate_ROI_idx = tf.squeeze(tf.where(tf.logical_and(objectness > 0.43, conf_score > self.conf_threshold)))
 
         if tf.size(candidate_ROI_idx) == 0:
             return None
@@ -85,7 +78,7 @@ class Detect(object):
             classes = tf.expand_dims(classes, axis=0)
 
             return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
-
+        
         selected_indices = tf.image.non_max_suppression(boxes, scores, 100, self.nms_threshold)
 
         boxes = tf.gather(boxes, selected_indices)
@@ -93,69 +86,24 @@ class Detect(object):
         masks = tf.gather(masks, selected_indices)
         classes = tf.gather(classes, selected_indices)
 
-        # apply fast nms for final detection
-        # top_k = tf.math.minimum(self.top_k, tf.size(candidate_ROI_idx))
-        # boxes, masks, classes, scores = self._fast_nms(boxes, masks, scores, self.nms_threshold, top_k)
-
         return {'box': boxes, 'mask': masks, 'class': classes, 'score': scores}
-
-    def _fast_nms(self, boxes, masks, scores, iou_threshold=0.5, top_k=200, second_threshold=False):
-        scores, idx = tf.math.top_k(scores, k=top_k)
-        num_classes, num_dets = tf.shape(idx)[0], tf.shape(idx)[1]
-
-        boxes = tf.gather(boxes, idx)
-
-        masks = tf.gather(masks, idx)
-
-        iou = utils.jaccard(boxes, boxes)
-
-        # upper trangular matrix - diagnoal
-        upper_triangular = tf.linalg.band_part(iou, 0, -1)
-        diag = tf.linalg.band_part(iou, 0, 0)
-        iou = upper_triangular - diag
-
-        # fitler out the unwanted ROI
-        iou_max = tf.reduce_max(iou, axis=1)
-        idx_det = tf.where(iou_max < iou_threshold)
-
-        classes = tf.broadcast_to(tf.expand_dims(tf.range(num_classes), axis=-1), tf.shape(iou_max))
-        classes = tf.gather_nd(classes, idx_det)
-        boxes = tf.gather_nd(boxes, idx_det)
-        masks = tf.gather_nd(masks, idx_det)
-        scores = tf.gather_nd(scores, idx_det)
-
-        max_num_detection = tf.math.minimum(self.top_k, tf.size(scores))
-        # number of max detection = 100 (u can choose whatever u want)
-        scores, idx = tf.math.top_k(scores, k=max_num_detection)
-        classes = tf.gather(classes, idx)
-        boxes = tf.gather(boxes, idx)
-        masks = tf.gather(masks, idx)
-        scores = tf.gather(scores, idx)
-
-        # Todo Handle the situation that only 1 or 0 detection
-        # second threshold
-        positive_det = tf.squeeze(tf.where(scores > self.conf_threshold))
-        scores = tf.gather(scores, positive_det)
-        classes = classes[:tf.size(scores)]
-        boxes = boxes[:tf.size(scores)]
-        masks = masks[:tf.size(scores)]
-
-        return boxes, masks, classes, scores
 
 lr_schedule = learning_rate_schedule.Yolact_LearningRateSchedule(warmup_steps=500, warmup_lr=1e-4, initial_lr=1e-3)
 optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=0.9)
 
-YOLACT = lite.MyYolact(input_size=256,
-               fpn_channels=96,
-               feature_map_size=[32, 16, 8, 4, 2],
-               num_class=13,
-               num_mask=32,
-               aspect_ratio=[1, 0.5, 2],
-               scales=[24, 48, 96, 192, 384])
+anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2])
+YOLACT = lite.MyYolact(
+    input_size=256,
+    fpn_channels=96, 
+    anchorobj=anchorobj,
+    feature_map_size=[32, 16, 8, 4, 2], 
+    num_class=13, # 12 classes + 1 background
+    num_mask=32
+)
 
 model = YOLACT.gen()
 
-ckpt_dir = "checkpoints-SGD-focal"
+ckpt_dir = "checkpoints-SGD"
 latest = tf.train.latest_checkpoint(ckpt_dir)
 
 checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
@@ -167,10 +115,10 @@ print("Restore Ckpt Sucessfully!!")
 # Need default anchor
 anchorobj = anchor.Anchor(img_size=256, feature_map_size=[32, 16, 8, 4, 2])
 valid_dataset = dataset_coco.prepare_evalloader(img_size=256,
-                                                tfrecord_dir='data/obj_tfrecord_256x256_20200930',
+                                                tfrecord_dir='data/obj_tfrecord_256x256_20201102',
                                                 subset='val')
 anchors = anchorobj.get_anchors()
-detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.3, nms_threshold=0.5, anchors=anchors)
+detect_layer = Detect(num_cls=13, label_background=0, top_k=200, conf_threshold=0.95, nms_threshold=0.5, anchors=anchors)
 
 remapping = [
     'Background',
