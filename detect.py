@@ -101,7 +101,7 @@ YOLACT = lite.MyYolact(
 
 model = YOLACT.gen()
 
-ckpt_dir = "checkpoints-SGD"
+ckpt_dir = "checkpoints-SGD-256x256"
 latest = tf.train.latest_checkpoint(ckpt_dir)
 
 checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
@@ -112,7 +112,7 @@ status = checkpoint.restore(tf.train.latest_checkpoint(ckpt_dir))
 # -----------------------------------------------------------------------------------------------
 # Need default anchor
 
-valid_dataset = dataset_coco.prepare_dataloader(img_size=256,
+valid_dataset = dataset_coco.prepare_dataloader_256x256(img_size=256,
                                                 tfrecord_dir='data/obj_tfrecord_256x256_20201102',
                                                 batch_size=1,
                                                 subset='val')

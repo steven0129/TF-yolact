@@ -5,7 +5,7 @@ class MobileNetV2():
         self.base_model = tf.keras.applications.MobileNetV2(
             input_shape=input_shape, 
             include_top=False, 
-            alpha=0.5,
+            alpha=0.75,
             layers=tf.keras.layers, 
             weights='imagenet'
         )
@@ -50,71 +50,71 @@ class MobileNetV2():
 
         self.down_blocks = [
             {
-                'expand': tf.keras.layers.Conv2D(160, (1, 1), 2, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
+                'expand': tf.keras.layers.Conv2D(240, (1, 1), 2, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
                 'expand_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'expand_relu': tf.keras.layers.ReLU(),
                 'conv_dw': tf.keras.layers.DepthwiseConv2D((3, 3), padding='same', depth_multiplier=6, strides=1, use_bias=False),
                 'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'conv_dw_relu': tf.keras.layers.ReLU(),
-                'project': tf.keras.layers.Conv2D(160, (1, 1), padding='same', use_bias=False, strides=1),
+                'project': tf.keras.layers.Conv2D(240, (1, 1), padding='same', use_bias=False, strides=1),
                 'project_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'dropout': tf.keras.layers.Dropout(dropout)
             },
             {
-                'expand': tf.keras.layers.Conv2D(160, (1, 1), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
+                'expand': tf.keras.layers.Conv2D(240, (1, 1), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
                 'expand_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'expand_relu': tf.keras.layers.ReLU(),
                 'conv_dw': tf.keras.layers.DepthwiseConv2D((3, 3), padding='same', depth_multiplier=3, strides=1, use_bias=False),
                 'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'conv_dw_relu': tf.keras.layers.ReLU(),
-                'project': tf.keras.layers.Conv2D(160, (1, 1), padding='same', use_bias=False, strides=1),
+                'project': tf.keras.layers.Conv2D(240, (1, 1), padding='same', use_bias=False, strides=1),
                 'project_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'dropout': tf.keras.layers.Dropout(dropout),
                 'add': tf.keras.layers.add
             },
             {
-                'expand': tf.keras.layers.Conv2D(160, (1, 1), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
+                'expand': tf.keras.layers.Conv2D(240, (1, 1), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
                 'expand_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'expand_relu': tf.keras.layers.ReLU(),
                 'conv_dw': tf.keras.layers.DepthwiseConv2D((3, 3), padding='same', depth_multiplier=6, strides=1, use_bias=False),
                 'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'conv_dw_relu': tf.keras.layers.ReLU(),
-                'project': tf.keras.layers.Conv2D(160, (1, 1), padding='same', use_bias=False, strides=1),
+                'project': tf.keras.layers.Conv2D(240, (1, 1), padding='same', use_bias=False, strides=1),
                 'project_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'dropout': tf.keras.layers.Dropout(dropout),
                 'add': tf.keras.layers.add
             },
             {
-                'expand': tf.keras.layers.Conv2D(160, (1, 1), 2, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
+                'expand': tf.keras.layers.Conv2D(240, (1, 1), 2, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
                 'expand_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'expand_relu': tf.keras.layers.ReLU(),
                 'conv_dw': tf.keras.layers.DepthwiseConv2D((3, 3), padding='same', depth_multiplier=3, strides=1, use_bias=False),
                 'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'conv_dw_relu': tf.keras.layers.ReLU(),
-                'project': tf.keras.layers.Conv2D(160, (1, 1), padding='same', use_bias=False, strides=1),
+                'project': tf.keras.layers.Conv2D(240, (1, 1), padding='same', use_bias=False, strides=1),
                 'project_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'dropout': tf.keras.layers.Dropout(dropout)
             },
             {
-                'expand': tf.keras.layers.Conv2D(160, (1, 1), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
+                'expand': tf.keras.layers.Conv2D(240, (1, 1), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
                 'expand_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'expand_relu': tf.keras.layers.ReLU(),
                 'conv_dw': tf.keras.layers.DepthwiseConv2D((3, 3), padding='same', depth_multiplier=3, strides=1, use_bias=False),
                 'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'conv_dw_relu': tf.keras.layers.ReLU(),
-                'project': tf.keras.layers.Conv2D(160, (1, 1), padding='same', use_bias=False, strides=1),
+                'project': tf.keras.layers.Conv2D(240, (1, 1), padding='same', use_bias=False, strides=1),
                 'project_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'dropout': tf.keras.layers.Dropout(dropout),
                 'add': tf.keras.layers.add
             },
             {
-                'expand': tf.keras.layers.Conv2D(160, (1, 1), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
+                'expand': tf.keras.layers.Conv2D(240, (1, 1), 1, padding='same', kernel_initializer=tf.keras.initializers.glorot_uniform()),
                 'expand_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'expand_relu': tf.keras.layers.ReLU(),
                 'conv_dw': tf.keras.layers.DepthwiseConv2D((3, 3), padding='same', depth_multiplier=3, strides=1, use_bias=False),
                 'conv_dw_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'conv_dw_relu': tf.keras.layers.ReLU(),
-                'project': tf.keras.layers.Conv2D(160, (1, 1), padding='same', use_bias=False, strides=1),
+                'project': tf.keras.layers.Conv2D(240, (1, 1), padding='same', use_bias=False, strides=1),
                 'project_bn': tf.keras.layers.BatchNormalization(axis=-1),
                 'dropout': tf.keras.layers.Dropout(dropout),
                 'add': tf.keras.layers.add

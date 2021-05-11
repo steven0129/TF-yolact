@@ -40,6 +40,32 @@ def prepare_dataloader(tfrecord_dir, batch_size, img_size, subset="train"):
 
     return dataset
 
+def prepare_dataloader_256x256(tfrecord_dir, batch_size, img_size, subset="train"):
+
+    anchorobj = anchor.Anchor(img_size=img_size, feature_map_size=[32, 16, 8, 4, 2])
+
+    parser = yolact_parser.Parser(output_size=img_size,
+                                  anchor_instance=anchorobj,
+                                  match_threshold=0.7,
+                                  unmatched_threshold=0.7,
+                                  proto_output_size=64,
+                                  mode=subset)
+    files = tf.io.matching_files(os.path.join(tfrecord_dir, "obj_%s.*" % subset))
+    num_shards = tf.cast(tf.shape(files)[0], tf.int64)
+    shards = tf.data.Dataset.from_tensor_slices(files)
+    shards = shards.shuffle(num_shards)
+    shards = shards.repeat()
+    dataset = shards.interleave(tf.data.TFRecordDataset,
+                                cycle_length=num_shards,
+                                num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    dataset = dataset.shuffle(buffer_size=2048)
+    dataset = dataset.map(map_func=parser, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.batch(batch_size, drop_remainder=True)
+    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+
+    return dataset
+
 def prepare_evalloader(tfrecord_dir, img_size, subset="train"):
 
     anchorobj = anchor.Anchor(img_size=img_size, feature_map_size=[69, 35, 18, 9, 5])
@@ -48,7 +74,7 @@ def prepare_evalloader(tfrecord_dir, img_size, subset="train"):
                                   anchor_instance=anchorobj,
                                   match_threshold=0.7,
                                   unmatched_threshold=0.7,
-                                  proto_output_size=64,
+                                  proto_output_size=138,
                                   mode=subset)
     files = tf.io.matching_files(os.path.join(tfrecord_dir, "obj_%s.*" % subset))
     num_shards = tf.cast(tf.shape(files)[0], tf.int64)
